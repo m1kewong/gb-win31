@@ -23,7 +23,7 @@ static UINT8 home_cursor_y_positions[HOME_SCREEN_NUM_ITEMS] = {8, 10, 12}; // Ma
 void fill_bkg_rect_attributes(UBYTE x, UBYTE y, UBYTE w, UBYTE h, UBYTE attributes) {
     for (UBYTE iy = 0; iy < h; ++iy) {
         for (UBYTE ix = 0; ix < w; ++ix) {
-            set_bkg_attributes_xy(x + ix, y + iy, attributes);
+            set_bkg_attribute_xy(x + ix, y + iy, attributes);
         }
     }
 }
@@ -32,47 +32,47 @@ void fill_bkg_rect_attributes(UBYTE x, UBYTE y, UBYTE w, UBYTE h, UBYTE attribut
 // and applies the given palette_idx to them.
 void draw_text_bkg(UBYTE x, UBYTE y, const char* text, UBYTE palette_idx) {
     UBYTE len = strlen(text);
-    UBYTE attribute = CGB_PAL(palette_idx);
+    UBYTE attribute = palette_idx;
     for (UBYTE i = 0; i < len; ++i) {
         set_bkg_tile_xy(x + i, y, text[i]); 
-        set_bkg_attributes_xy(x + i, y, attribute);
+        set_bkg_attribute_xy(x + i, y, attribute);
     }
 }
 
 // Modified draw_text_bkg to include max_width and a clear_bg option
 void draw_text_bkg_clipped(UBYTE x, UBYTE y, const char* text, UBYTE palette_idx, UBYTE max_width, UBYTE bg_fill_tile, UBYTE bg_palette_idx) {
     UBYTE len = strlen(text);
-    UBYTE attribute = CGB_PAL(palette_idx);
-    UBYTE bg_attribute = CGB_PAL(bg_palette_idx);
+    UBYTE attribute = palette_idx;
+    UBYTE bg_attribute = bg_palette_idx;
     UBYTE char_to_draw;
 
     for (UBYTE i = 0; i < max_width; ++i) {
         if (i < len) {
             char_to_draw = text[i];
             set_bkg_tile_xy(x + i, y, char_to_draw);
-            set_bkg_attributes_xy(x + i, y, attribute);
+            set_bkg_attribute_xy(x + i, y, attribute);
         } else {
             // Fill remaining space in max_width with bg_fill_tile and bg_palette_idx
             set_bkg_tile_xy(x + i, y, bg_fill_tile);
-            set_bkg_attributes_xy(x + i, y, bg_attribute);
+            set_bkg_attribute_xy(x + i, y, bg_attribute);
         }
     }
 }
 
 // New GBSWINDOWS Style drawing function for a complete window
 void gbs_draw_window(UBYTE x, UBYTE y, UBYTE w, UBYTE h, const char* title, UBYTE is_active) {
-    UBYTE frame_pal_attr = CGB_PAL(PAL_IDX_GBS_WINDOW_FRAME);
-    UBYTE content_pal_attr = CGB_PAL(PAL_IDX_GBS_WINDOW_CONTENT);
+    UBYTE frame_pal_attr = PAL_IDX_GBS_WINDOW_FRAME;
+    UBYTE content_pal_attr = PAL_IDX_GBS_WINDOW_CONTENT;
     UBYTE title_pal_attr;
     UBYTE title_tile_l, title_tile_m, title_tile_r;
 
     if (is_active) {
-        title_pal_attr = CGB_PAL(PAL_IDX_GBS_TITLE_ACTIVE);
+        title_pal_attr = PAL_IDX_GBS_TITLE_ACTIVE;
         title_tile_l = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_BAR_L;
         title_tile_m = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_BAR_M;
         title_tile_r = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_BAR_R;
     } else {
-        title_pal_attr = CGB_PAL(PAL_IDX_GBS_TITLE_INACTIVE);
+        title_pal_attr = PAL_IDX_GBS_TITLE_INACTIVE;
         title_tile_l = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_L_INACTIVE;
         title_tile_m = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_M_INACTIVE;
         title_tile_r = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_R_INACTIVE;
@@ -83,10 +83,10 @@ void gbs_draw_window(UBYTE x, UBYTE y, UBYTE w, UBYTE h, const char* title, UBYT
     set_bkg_tile_xy(x + w - 1, y, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_FRAME_TR);
     set_bkg_tile_xy(x, y + h - 1, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_FRAME_BL);
     set_bkg_tile_xy(x + w - 1, y + h - 1, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_FRAME_BR);
-    set_bkg_attributes_xy(x, y, frame_pal_attr);
-    set_bkg_attributes_xy(x + w - 1, y, frame_pal_attr);
-    set_bkg_attributes_xy(x, y + h - 1, frame_pal_attr);
-    set_bkg_attributes_xy(x + w - 1, y + h - 1, frame_pal_attr);
+    set_bkg_attribute_xy(x, y, frame_pal_attr);
+    set_bkg_attribute_xy(x + w - 1, y, frame_pal_attr);
+    set_bkg_attribute_xy(x, y + h - 1, frame_pal_attr);
+    set_bkg_attribute_xy(x + w - 1, y + h - 1, frame_pal_attr);
 
     fill_bkg_rect(x + 1, y, w - 2, 1, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_FRAME_T);
     fill_bkg_rect(x + 1, y + h - 1, w - 2, 1, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_FRAME_B);
@@ -135,19 +135,19 @@ void gbs_draw_window(UBYTE x, UBYTE y, UBYTE w, UBYTE h, const char* title, UBYT
                           is_active ? PAL_IDX_GBS_TITLE_ACTIVE : PAL_IDX_GBS_TITLE_INACTIVE // BG palette for clipping
                           );
 
-    UBYTE deco_pal_attr = CGB_PAL(PAL_IDX_GBS_WINDOW_FRAME); // Or a specific deco button palette
+    UBYTE deco_pal_attr = PAL_IDX_GBS_WINDOW_FRAME; // Or a specific deco button palette
     UBYTE deco_x_start = x + w - 1 - 3; // x of first deco button (min)
     
     // Place the right end of the title bar pattern just before the decoration buttons
     set_bkg_tile_xy(deco_x_start -1 , title_bar_y, title_tile_r);
-    set_bkg_attributes_xy(deco_x_start -1, title_bar_y, title_pal_attr); // Ensure it has title bar palette
+    set_bkg_attribute_xy(deco_x_start -1, title_bar_y, title_pal_attr); // Ensure it has title bar palette
 
     set_bkg_tile_xy(deco_x_start, title_bar_y, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_DECO_MIN);
     set_bkg_tile_xy(deco_x_start + 1, title_bar_y, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_DECO_MAX);
     set_bkg_tile_xy(deco_x_start + 2, title_bar_y, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_DECO_CLOSE);
-    set_bkg_attributes_xy(deco_x_start, title_bar_y, deco_pal_attr);
-    set_bkg_attributes_xy(deco_x_start + 1, title_bar_y, deco_pal_attr);
-    set_bkg_attributes_xy(deco_x_start + 2, title_bar_y, deco_pal_attr);
+    set_bkg_attribute_xy(deco_x_start, title_bar_y, deco_pal_attr);
+    set_bkg_attribute_xy(deco_x_start + 1, title_bar_y, deco_pal_attr);
+    set_bkg_attribute_xy(deco_x_start + 2, title_bar_y, deco_pal_attr);
 
     UBYTE content_x = x + 1;
     UBYTE content_y = y + GBS_TITLE_BAR_HEIGHT;
@@ -163,9 +163,9 @@ void gbs_draw_icon(UBYTE screen_x, UBYTE screen_y, UBYTE icon_vram_start_idx, co
     set_bkg_tile_xy(screen_x, screen_y, icon_vram_start_idx);
     set_bkg_tile_xy(screen_x + 1, screen_y, icon_vram_start_idx + 1);
     
-    UBYTE icon_gfx_attr = CGB_PAL(icon_gfx_pal_idx);
-    set_bkg_attributes_xy(screen_x, screen_y, icon_gfx_attr);
-    set_bkg_attributes_xy(screen_x + 1, screen_y, icon_gfx_attr);
+    UBYTE icon_gfx_attr = icon_gfx_pal_idx;
+    set_bkg_attribute_xy(screen_x, screen_y, icon_gfx_attr);
+    set_bkg_attribute_xy(screen_x + 1, screen_y, icon_gfx_attr);
 
     UBYTE label_y = screen_y + GBS_ICON_TILE_HEIGHT;
     UBYTE label_len = strlen(label);
@@ -184,7 +184,7 @@ void gbs_draw_icon(UBYTE screen_x, UBYTE screen_y, UBYTE icon_vram_start_idx, co
     }
 
     fill_bkg_rect(screen_x, label_y, GBS_ICON_TILE_WIDTH, 1, text_bg_fill_tile);
-    fill_bkg_rect_attributes(screen_x, label_y, GBS_ICON_TILE_WIDTH, 1, CGB_PAL(text_bg_palette));
+    fill_bkg_rect_attributes(screen_x, label_y, GBS_ICON_TILE_WIDTH, 1, text_bg_palette);
 
     draw_text_bkg_clipped(label_x, label_y, label, 
                           text_palette_to_use, 
@@ -196,7 +196,7 @@ void gbs_draw_icon(UBYTE screen_x, UBYTE screen_y, UBYTE icon_vram_start_idx, co
 // Refactored function to draw the GBSWINDOWS home screen
 void ui_home_draw_desktop_and_windows() {
     fill_bkg_rect(0, 0, GBS_SCREEN_TILE_WIDTH, GBS_SCREEN_TILE_HEIGHT, HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_DESKTOP_FILL);
-    fill_bkg_rect_attributes(0, 0, GBS_SCREEN_TILE_WIDTH, GBS_SCREEN_TILE_HEIGHT, CGB_PAL(PAL_IDX_GBS_DESKTOP));
+    fill_bkg_rect_attributes(0, 0, GBS_SCREEN_TILE_WIDTH, GBS_SCREEN_TILE_HEIGHT, PAL_IDX_GBS_DESKTOP);
 
     gbs_draw_window(GBS_MAIN_WIN_X, GBS_MAIN_WIN_Y, GBS_MAIN_WIN_W, GBS_MAIN_WIN_H, "Program Manager", TRUE);
 
@@ -293,4 +293,25 @@ void ui_init() {
     DISPLAY_ON;
     SHOW_BKG;
     SHOW_SPRITES;
+}
+
+// Implementation of run_home_screen - handles the main desktop/program manager
+UINT8 run_home_screen(void) {
+    static UINT8 initialized = 0;
+    static UINT8 selected_icon_idx = 0;
+    
+    if (!initialized) {
+        ui_home_draw_desktop_and_windows();
+        initialized = 1;
+    }
+    
+    // Get current joypad state from global variable
+    extern UINT8 joypad_state;
+    UINT8 current_joypad = joypad_state;
+    
+    // Handle input and return next app state
+    APP_STATE next_state = APP_STATE_HOME;
+    ui_home_handle_input(current_joypad, &next_state, &selected_icon_idx);
+    
+    return next_state;
 }

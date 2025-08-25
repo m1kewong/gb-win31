@@ -71,6 +71,7 @@ extern const unsigned char minesweeper_cursor_sprite_vram[]; // Corrected name
 // --- General Purpose Tiles (e.g., for filling areas) ---
 // These are loaded early and can be reused.
 // Their VRAM locations are defined here.
+#define TILE_IDX_BLANK                  0x6F // Added missing definition
 #define TILE_IDX_EMPTY_BLACK            0x70 // Fixed hex value
 #define TILE_IDX_EMPTY_TEAL             0x71 // Fixed hex value
 #define TILE_IDX_EMPTY_GREY             0x72 // Fixed hex value
@@ -190,10 +191,25 @@ void load_all_palettes(void); // Renamed for clarity if it wasn't already
 extern const unsigned char gbs_desktop_fill_tile_data[];
 extern const unsigned char gbs_frame_tiles_data[]; // Array containing all 8 frame tiles
 extern const unsigned char gbs_title_bar_tiles_data[]; // Array for L, M, R active title bar pattern tiles
-extern const unsigned char gbs_deco_min_tile_data[];
-extern const unsigned char gbs_deco_max_tile_data[];
-extern const unsigned char gbs_deco_close_tile_data[];
+extern const unsigned char gbs_title_bar_inactive_tiles_data[]; // Added missing definition
+extern const unsigned char gbs_decoration_tiles_data[]; // Added missing definition
+extern const unsigned char gbs_scrollbar_tiles_data[]; // Added missing definition
 extern const unsigned char gbs_content_fill_tile_data[];
+
+// Add missing tile data definitions
+extern const unsigned char minesweeper_base_tiles_vram_format[];
+extern const unsigned char minesweeper_number_tiles_vram_format[];
+extern const unsigned char home_ui_tiles_vram_format[];
+extern const unsigned char ui_cursor_sprite_vram[];
+
+// Missing icon-related definitions
+#define TILE_IDX_UI_ICON_MS     TILE_IDX_GBS_ICON_MS_START
+#define TILE_IDX_UI_ICON_PAINT  TILE_IDX_GBS_ICON_PAINT_START  
+#define TILE_IDX_UI_ICON_EXIT   TILE_IDX_GBS_ICON_EXIT_START
+#define HOME_ICON_MS_TILE_COUNT GBS_ICON_MS_TILE_COUNT
+#define HOME_ICON_PAINT_TILE_COUNT GBS_ICON_PAINT_TILE_COUNT
+#define HOME_ICON_EXIT_TILE_COUNT GBS_ICON_EXIT_TILE_COUNT
+#define HOME_UI_TILE_COUNT HOME_GBS_UI_TILE_COUNT
 
 // Externs for inactive title bar tiles
 extern const unsigned char gbs_title_L_inactive_tile_data[];

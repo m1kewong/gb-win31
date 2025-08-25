@@ -10,7 +10,6 @@
 #include "../include/app_states.h" // Include app_states.h
 
 extern void gotoxy(int x, int y); // Explicit declaration
-extern void set_bkg_attributes_xy(UBYTE x, UBYTE y, UBYTE attributes); // Explicit declaration
 extern UINT8 current_app_state;
 extern UINT8 joypad_state;
 
@@ -46,9 +45,9 @@ static void paint_draw_ui(void) {
     gotoxy(1, PAINT_UI_Y);
     printf("%s", text_buffer_paint);
     set_bkg_tile_xy(1 + (UINT8)strlen(text_buffer_paint), PAINT_UI_Y, available_draw_tiles[0]); // Black swatch
-    set_bkg_attributes_xy(1 + (UINT8)strlen(text_buffer_paint), PAINT_UI_Y, PAL_IDX_BG_PAINT);
+    set_bkg_attribute_xy(1 + (UINT8)strlen(text_buffer_paint), PAINT_UI_Y, PAL_IDX_BG_PAINT);
     set_bkg_tile_xy(1 + (UINT8)strlen(text_buffer_paint) + 1, PAINT_UI_Y, available_draw_tiles[1]); // White swatch
-    set_bkg_attributes_xy(1 + (UINT8)strlen(text_buffer_paint) + 1, PAINT_UI_Y, PAL_IDX_BG_PAINT);
+    set_bkg_attribute_xy(1 + (UINT8)strlen(text_buffer_paint) + 1, PAINT_UI_Y, PAL_IDX_BG_PAINT);
     
     // Indicate selected swatch (e.g. by drawing a small frame or different tile under it)
     if(current_paint_color_idx == 0) {
@@ -79,7 +78,7 @@ void paint_at_cursor(void) {
         UINT8 screen_tile_y = PAINT_CANVAS_Y + canvas_tile_y;
 
         set_bkg_tile_xy(screen_tile_x, screen_tile_y, available_draw_tiles[current_paint_color_idx]);
-        set_bkg_attributes_xy(screen_tile_x, screen_tile_y, PAL_IDX_BG_PAINT);
+        set_bkg_attribute_xy(screen_tile_x, screen_tile_y, PAL_IDX_BG_PAINT);
     }
 }
 

@@ -9,7 +9,6 @@
 #include "../include/app_states.h" // Include app_states.h
 
 extern void gotoxy(int x, int y); // Explicit declaration
-extern void set_bkg_attributes_xy(UBYTE x, UBYTE y, UBYTE attributes); // Explicit declaration
 extern UINT8 current_app_state;
 extern UINT8 joypad_state;
 
@@ -275,7 +274,7 @@ static void ms_draw_board(void) {
             
             tile_to_draw_data[0] = MINESWEEPER_TILE_VRAM_OFFSET + tile_idx;
             set_bkg_tiles(screen_x, screen_y, 1, 1, tile_to_draw_data);
-            set_bkg_attributes_xy(screen_x, screen_y, PAL_IDX_BG_MINESWEEPER);
+            set_bkg_attribute_xy(screen_x, screen_y, PAL_IDX_BG_MINESWEEPER);
         }
     }
 }
@@ -308,7 +307,7 @@ static void ms_reveal_cell(uint8_t r, uint8_t c) {
         }
     } else {
         set_bkg_tile_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, TILE_IDX_MS_NUM_1 + (ms_board[r][c].adjacent_mines - 1));
-        set_bkg_attributes_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, PAL_IDX_BG_MINESWEEPER);
+        set_bkg_attribute_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, PAL_IDX_BG_MINESWEEPER);
     }
     ms_check_win_condition();
 }
