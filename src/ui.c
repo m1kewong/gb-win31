@@ -32,7 +32,7 @@ void fill_bkg_rect_attributes(UBYTE x, UBYTE y, UBYTE w, UBYTE h, UBYTE attribut
 // and applies the given palette_idx to them.
 void draw_text_bkg(UBYTE x, UBYTE y, const char* text, UBYTE palette_idx) {
     UBYTE len = strlen(text);
-    UBYTE attribute = palette_idx;
+    UBYTE attribute = (palette_idx);
     for (UBYTE i = 0; i < len; ++i) {
         set_bkg_tile_xy(x + i, y, text[i]); 
         set_bkg_attribute_xy(x + i, y, attribute);
@@ -42,8 +42,8 @@ void draw_text_bkg(UBYTE x, UBYTE y, const char* text, UBYTE palette_idx) {
 // Modified draw_text_bkg to include max_width and a clear_bg option
 void draw_text_bkg_clipped(UBYTE x, UBYTE y, const char* text, UBYTE palette_idx, UBYTE max_width, UBYTE bg_fill_tile, UBYTE bg_palette_idx) {
     UBYTE len = strlen(text);
-    UBYTE attribute = palette_idx;
-    UBYTE bg_attribute = bg_palette_idx;
+    UBYTE attribute = (palette_idx);
+    UBYTE bg_attribute = (bg_palette_idx);
     UBYTE char_to_draw;
 
     for (UBYTE i = 0; i < max_width; ++i) {
@@ -61,18 +61,18 @@ void draw_text_bkg_clipped(UBYTE x, UBYTE y, const char* text, UBYTE palette_idx
 
 // New GBSWINDOWS Style drawing function for a complete window
 void gbs_draw_window(UBYTE x, UBYTE y, UBYTE w, UBYTE h, const char* title, UBYTE is_active) {
-    UBYTE frame_pal_attr = PAL_IDX_GBS_WINDOW_FRAME;
-    UBYTE content_pal_attr = PAL_IDX_GBS_WINDOW_CONTENT;
+    UBYTE frame_pal_attr = PAL_IDX_GBS_DESKTOP;
+    UBYTE content_pal_attr = PAL_IDX_GBS_DESKTOP;
     UBYTE title_pal_attr;
     UBYTE title_tile_l, title_tile_m, title_tile_r;
 
     if (is_active) {
-        title_pal_attr = PAL_IDX_GBS_TITLE_ACTIVE;
+        title_pal_attr = PAL_IDX_GBS_DESKTOP;
         title_tile_l = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_BAR_L;
         title_tile_m = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_BAR_M;
         title_tile_r = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_BAR_R;
     } else {
-        title_pal_attr = PAL_IDX_GBS_TITLE_INACTIVE;
+        title_pal_attr = PAL_IDX_GBS_DESKTOP;
         title_tile_l = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_L_INACTIVE;
         title_tile_m = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_M_INACTIVE;
         title_tile_r = HOME_UI_TILE_VRAM_OFFSET + TILE_IDX_GBS_TITLE_R_INACTIVE;
@@ -135,7 +135,7 @@ void gbs_draw_window(UBYTE x, UBYTE y, UBYTE w, UBYTE h, const char* title, UBYT
                           is_active ? PAL_IDX_GBS_TITLE_ACTIVE : PAL_IDX_GBS_TITLE_INACTIVE // BG palette for clipping
                           );
 
-    UBYTE deco_pal_attr = PAL_IDX_GBS_WINDOW_FRAME; // Or a specific deco button palette
+    UBYTE deco_pal_attr = PAL_IDX_GBS_DESKTOP; // Or a specific deco button palette
     UBYTE deco_x_start = x + w - 1 - 3; // x of first deco button (min)
     
     // Place the right end of the title bar pattern just before the decoration buttons
@@ -163,7 +163,7 @@ void gbs_draw_icon(UBYTE screen_x, UBYTE screen_y, UBYTE icon_vram_start_idx, co
     set_bkg_tile_xy(screen_x, screen_y, icon_vram_start_idx);
     set_bkg_tile_xy(screen_x + 1, screen_y, icon_vram_start_idx + 1);
     
-    UBYTE icon_gfx_attr = icon_gfx_pal_idx;
+    UBYTE icon_gfx_attr = (icon_gfx_pal_idx);
     set_bkg_attribute_xy(screen_x, screen_y, icon_gfx_attr);
     set_bkg_attribute_xy(screen_x + 1, screen_y, icon_gfx_attr);
 
@@ -184,7 +184,7 @@ void gbs_draw_icon(UBYTE screen_x, UBYTE screen_y, UBYTE icon_vram_start_idx, co
     }
 
     fill_bkg_rect(screen_x, label_y, GBS_ICON_TILE_WIDTH, 1, text_bg_fill_tile);
-    fill_bkg_rect_attributes(screen_x, label_y, GBS_ICON_TILE_WIDTH, 1, text_bg_palette);
+    fill_bkg_rect_attributes(screen_x, label_y, GBS_ICON_TILE_WIDTH, 1, (text_bg_palette));
 
     draw_text_bkg_clipped(label_x, label_y, label, 
                           text_palette_to_use, 
@@ -283,7 +283,8 @@ void ui_home_handle_input(UINT8 joypad_data, APP_STATE* current_app_state, UBYTE
                 *current_app_state = APP_STATE_PAINT_INIT;
                 break;
             case 2:
-                *current_app_state = APP_STATE_BIOS_INIT;
+                // Exit should return to BIOS screen, then exit
+                *current_app_state = APP_STATE_BIOS;
                 break;
         }
     }

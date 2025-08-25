@@ -46,14 +46,17 @@ int main(void) {
                 show_bios_screen(); 
                 current_app_state = APP_STATE_HOME; 
                 break;
+            case APP_STATE_HOME_INIT:
             case APP_STATE_HOME:
                 // run_home_screen should handle its own display updates and palette usage (via attributes)
                 current_app_state = run_home_screen();
                 break;
+            case APP_STATE_MINESWEEPER_INIT:
             case APP_STATE_MINESWEEPER:
                 // start_minesweeper should handle its own display and palette usage
                 current_app_state = start_minesweeper();
                 break;
+            case APP_STATE_PAINT_INIT:
             case APP_STATE_PAINT:
                 // start_paint should handle its own display and palette usage
                 current_app_state = start_paint();
