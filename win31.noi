@@ -181,10 +181,10 @@ DEF _load_all_palettes 0x187F
 DEF _gbs_palette_desktop 0x191A
 DEF _gbs_palette_window_frame 0x1922
 DEF _gbs_palette_title_active 0x192A
-DEF _gbs_palette_title_inactive 0x1932
-DEF _gbs_palette_window_content 0x193A
-DEF _gbs_palette_icons_gfx 0x1942
-DEF _gbs_palette_icon_text 0x194A
+DEF _gbs_palette_window_content 0x1932
+DEF _gbs_palette_icons_gfx 0x193A
+DEF _gbs_palette_icon_text 0x1942
+DEF _gbs_palette_title_inactive 0x194A
 DEF _gbs_palette_scrollbar 0x1952
 DEF _gbs_palette_icon_text_selected 0x195A
 DEF _gbs_desktop_fill_tile_data 0x1962

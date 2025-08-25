@@ -398,12 +398,12 @@ _HEADER_LCD0           00000000    00000003 =           3. bytes (ABS,CON)
 Files Linked                              [ module(s) ]
 
 /tmp/gbdk/lib/gb/crt0.o                   [ Runtime ]
-/tmp/lcc42510.o                           [ main ]
-/tmp/lcc42511.o                           [ ui ]
-/tmp/lcc42512.o                           [ minesweeper ]
-/tmp/lcc42513.o                           [ paint ]
-/tmp/lcc42514.o                           [ sound ]
-/tmp/lcc42515.o                           [ tiles ]
+/tmp/lcc45470.o                           [ main ]
+/tmp/lcc45471.o                           [ ui ]
+/tmp/lcc45472.o                           [ minesweeper ]
+/tmp/lcc45473.o                           [ paint ]
+/tmp/lcc45474.o                           [ sound ]
+/tmp/lcc45475.o                           [ tiles ]
 
 
 Libraries Linked                          [ object file ]
