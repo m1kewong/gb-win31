@@ -1,9 +1,7 @@
 # GBDK C Compiler
-# CC = ../gbdk/bin/lcc
-CC = lcc
+CC = /tmp/gbdk/bin/lcc
 # Linker
-# LINK = ../gbdk/bin/lcc
-LINK = lcc
+LINK = /tmp/gbdk/bin/lcc
 CFLAGS=-Wl-j -Wm-yC -Wm-yc -Iinclude
 
 all: win31.gbc
@@ -18,5 +16,5 @@ win31.gbc: $(SRCS) include/tiles.h include/ui.h include/minesweeper.h include/pa
 	$(CC) $(CFLAGS) -o win31.gbc $(SRCS)
 
 clean:
-	if exist win31.gbc del /f /q win31.gbc
-	if exist src\*.o del /f /q src\*.o
+	rm -f win31.gbc
+	rm -f src/*.o
