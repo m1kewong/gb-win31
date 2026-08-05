@@ -31,7 +31,7 @@ TILE_BLANK = 64
 TILE_MS_HIDDEN = 78
 TILE_MS_FLAG = 79
 TILE_ICON_PAINT = 96
-TILE_POINTER_SPRITE = 118
+TILE_POINTER_SPRITE = 120
 
 DESKTOP_PAINT_TILES = (
     (3, 4, TILE_ICON_PAINT),
@@ -242,17 +242,17 @@ class RomSmoke:
         )
 
     def assert_pointer_sprite(self) -> None:
-        if not self.pyboy.memory[LCDC_REG] & OBJ_SIZE_8X16:
-            raise SmokeFailure(f"frame {self.frame}: pointer is not in 8x16 mode")
+        if self.pyboy.memory[LCDC_REG] & OBJ_SIZE_8X16:
+            raise SmokeFailure(f"frame {self.frame}: pointer is not in 8x8 mode")
 
         pointer_data = self.vram_bytes(
             0,
             0x8000 + TILE_POINTER_SPRITE * 16,
-            32,
+            16,
         )
-        if pointer_data[-8:] != bytes(8):
+        if pointer_data[-2:] != bytes(2) or any(byte & 1 for byte in pointer_data):
             raise SmokeFailure(
-                f"frame {self.frame}: pointer tail has no transparent padding"
+                f"frame {self.frame}: triangle has no transparent edge padding"
             )
 
     def launch_icon(self, index: int, title: tuple[int, int, str]) -> None:
@@ -380,9 +380,9 @@ def run_smoke(smoke: RomSmoke) -> None:
     print("ok Cannon fire/reset/exit")
 
     smoke.press(("right", "down"), frames=200)
-    if smoke.pointer_position() != (152, 128):
+    if smoke.pointer_position() != (152, 136):
         raise SmokeFailure(
-            f"frame {smoke.frame}: 8x16 pointer bounds were {smoke.pointer_position()}"
+            f"frame {smoke.frame}: 8x8 pointer bounds were {smoke.pointer_position()}"
         )
     print("ok full cursor bounds")
 

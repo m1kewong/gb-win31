@@ -176,7 +176,7 @@ void pointer_update(const InputState *input)
         if (pointer_state.y > 0u) --pointer_state.y;
     }
     if (input->held & J_DOWN) {
-        if (pointer_state.y < 128u) ++pointer_state.y;
+        if (pointer_state.y < 136u) ++pointer_state.y;
     }
     if (pointer_state.visible) {
         move_sprite(0u, (UINT8)(pointer_state.x + 8u), (UINT8)(pointer_state.y + 16u));
@@ -186,7 +186,7 @@ void pointer_update(const InputState *input)
 void pointer_move_to(UINT8 x, UINT8 y)
 {
     pointer_state.x = (x > 152u) ? 152u : x;
-    pointer_state.y = (y > 128u) ? 128u : y;
+    pointer_state.y = (y > 136u) ? 136u : y;
     if (pointer_state.visible) {
         move_sprite(0u, (UINT8)(pointer_state.x + 8u), (UINT8)(pointer_state.y + 16u));
     }
@@ -206,7 +206,7 @@ UINT8 pointer_hits(UINT8 x, UINT8 y, UINT8 w, UINT8 h)
 void ui_init(void)
 {
     DISPLAY_OFF;
-    SPRITES_8x16;
+    SPRITES_8x8;
     assets_load();
     pointer_reset(80u, 72u);
     ui_clear(PAL_DESKTOP);

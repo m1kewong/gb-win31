@@ -3,7 +3,7 @@
 
 #include <gb/gb.h>
 
-/* Tiles 118-119 are the 8 x 16 pointer. Desktop text owns this bank-0 range. */
+/* Tile 120 is the 8 x 8 pointer. Desktop text owns this bank-0 range. */
 #define DESKTOP_TEXT_TILE_FIRST 121u
 #define DESKTOP_TEXT_TILE_LIMIT 181u
 #define DESKTOP_TEXT_TILE_COUNT 47u

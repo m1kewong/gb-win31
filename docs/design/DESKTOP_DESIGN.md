@@ -39,8 +39,8 @@ so no label can touch a neighbor or replace a frame tile.
 - Active titles and the selected caption are white on royal blue.
 - Inactive group chrome is gray with black text.
 - Use the pointer and reversed caption as selection; remove the extra `+` mark.
-- Render the pointer as an 8 x 16 sprite with transparent tail padding so no
-  part of the arrow touches or appears clipped by its tile boundary.
+- Render the pointer as a tail-free 45-degree triangle inside one 8 x 8 sprite,
+  with a transparent right column and bottom row.
 - Icon and caption share one 32 x 32 hit target.
 - Icons are original 16 x 16 VGA-like art using the existing four-color icon
   palette.

@@ -361,26 +361,18 @@ static void build_misc_tiles(void)
 
 static void build_pointer(void)
 {
-    static const UINT8 pointer_tiles[32] = {
+    static const UINT8 pointer_tile[16] = {
         0x80u, 0x80u,
         0xc0u, 0xc0u,
         0xe0u, 0xa0u,
         0xf0u, 0x90u,
         0xf8u, 0x88u,
         0xfcu, 0x84u,
-        0xfeu, 0x82u,
-        0xf8u, 0xb8u,
-        0xf8u, 0xe8u,
-        0x38u, 0x28u,
-        0x38u, 0x28u,
-        0x38u, 0x38u,
-        0x00u, 0x00u,
-        0x00u, 0x00u,
-        0x00u, 0x00u,
+        0xfeu, 0xfeu,
         0x00u, 0x00u
     };
 
-    set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tiles);
+    set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tile);
 }
 
 void assets_load(void)
