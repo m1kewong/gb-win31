@@ -1,67 +1,69 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
-#include <stdio.h> 
-#include "../include/app_states.h" // Include app states
-#include "../include/ui.h"
-#include "../include/minesweeper.h"
-#include "../include/paint.h"
-#include "../include/sound.h" // Ensure sound.h is included for play_sound prototype
-#include "../include/tiles.h"
 
-extern void gotoxy(int x, int y);
+#include "app.h"
+#include "audio.h"
+#include "boot.h"
+#include "desktop.h"
+#include "input.h"
+#include "minesweeper.h"
+#include "paint.h"
+#include "piano.h"
+#include "media.h"
+#include "cannon.h"
+#include "ui.h"
 
-UINT8 current_app_state; // Declare current_app_state globally or pass as param
-UINT8 joypad_state;      // Declare joypad_state globally or pass as param
-
-void show_bios_screen(void) {
-    HIDE_SPRITES;
-    // Ensure background is cleared with a tile using the BIOS palette
-    fill_bkg_rect((UINT8)0, (UINT8)0, (UINT8)20, (UINT8)18, (UINT8)TILE_IDX_EMPTY_BLACK); // Assuming TILE_IDX_EMPTY_BLACK is set up for this
-    fill_bkg_rect_attributes((UINT8)0, (UINT8)0, (UINT8)20, (UINT8)18, (UINT8)PAL_IDX_BG_BIOS); // Use BIOS palette index
-
-    gotoxy(6, 8);
-    printf("GBC BIOS v1.0"); 
-    gotoxy(3, 10);
-    printf("Inspired by Win3.1");
-    delay(2000); // Keep delay for BIOS screen visibility
+static void enter_state(AppState state)
+{
+    switch (state) {
+        case APP_BOOT: boot_enter(); break;
+        case APP_DOS: dos_enter(); break;
+        case APP_DESKTOP: desktop_enter(); break;
+        case APP_SWEEPER: minesweeper_enter(); break;
+        case APP_PAINT: paint_enter(); break;
+        case APP_PIANO: piano_enter(); break;
+        case APP_MEDIA: media_enter(); break;
+        case APP_CANNON: cannon_enter(); break;
+        default: desktop_enter(); break;
+    }
 }
 
-int main(void) {
-    SPRITES_8x8;
+static AppState update_state(AppState state, const InputState *input)
+{
+    switch (state) {
+        case APP_BOOT: return boot_update(input);
+        case APP_DOS: return dos_update(input);
+        case APP_DESKTOP: return desktop_update(input);
+        case APP_SWEEPER: return minesweeper_update(input);
+        case APP_PAINT: return paint_update(input);
+        case APP_PIANO: return piano_update(input);
+        case APP_MEDIA: return media_update(input);
+        case APP_CANNON: return cannon_update(input);
+        default: return APP_DESKTOP;
+    }
+}
 
-    load_all_tiles();    
-    load_all_palettes(); // This function should set up all necessary palettes
+void main(void)
+{
+    AppState current_state;
+    AppState next_state;
 
-    init_sound(); // init_sound() should be called before play_sound()
-    play_sound(SFX_BOOT); 
+    cpu_fast();
+    audio_init();
+    input_init();
+    ui_init();
 
-    current_app_state = APP_STATE_BIOS;
+    current_state = APP_BOOT;
+    enter_state(current_state);
 
-    while(1) {
-        wait_vbl_done();
-        joypad_state = joypad(); // Read joypad state once per frame
-
-        switch(current_app_state) {
-            case APP_STATE_BIOS:
-                show_bios_screen(); 
-                current_app_state = APP_STATE_HOME; 
-                break;
-            case APP_STATE_HOME:
-                // run_home_screen should handle its own display updates and palette usage (via attributes)
-                current_app_state = run_home_screen();
-                break;
-            case APP_STATE_MINESWEEPER:
-                // start_minesweeper should handle its own display and palette usage
-                current_app_state = start_minesweeper();
-                break;
-            case APP_STATE_PAINT:
-                // start_paint should handle its own display and palette usage
-                current_app_state = start_paint();
-                break;
-            default:
-                current_app_state = APP_STATE_HOME; // Default to home if state is unknown
-                break;
+    while (1) {
+        vsync();
+        input_update();
+        next_state = update_state(current_state, input_get());
+        audio_tick();
+        if (next_state != current_state) {
+            current_state = next_state;
+            enter_state(current_state);
         }
     }
-    // return 0; // Unreachable in GBDK main loop
 }

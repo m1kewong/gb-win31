@@ -1,26 +1,15 @@
 steps:
-  # Step 1: Use a GBDK-enabled Docker image and run make
-  - name: 'ghcr.io/gbdk-2020/gbdk-2020:latest'
-    entrypoint: 'make'
-    args: ['-C', '.'] # Run make in the current directory (source root)
+  - name: ghcr.io/gbdk-2020/gbdk-2020:4.5.0
+    entrypoint: make
+    args: ["LCC=lcc", "all"]
+  - name: python:3.12-slim
+    entrypoint: python3
+    args: ["tools/verify_rom.py", "build/gb-win31.gbc"]
 
-  # Step 2: (Optional) List files to verify build output - useful for debugging
-  - name: 'gcr.io/cloud-builders/gcloud'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "--- Listing files after make ---"
-        ls -la
-        echo "--- Listing bin directory ---"
-        ls -la bin/
-
-# Define the artifacts to store
 artifacts:
   objects:
-    # Replace <YOUR-GCS-BUCKET-NAME> with your actual GCS bucket name
-    location: 'gs://<YOUR-GCS-BUCKET-NAME>/win31_gb_clone/'
-    paths:
-      # This assumes your Makefile outputs the ROM to a 'bin' directory
-      # and the ROM is named 'win31.gb'
-      - 'bin/win31.gb'
+    location: ${_ARTIFACT_LOCATION}
+    paths: ["build/gb-win31.gbc"]
+
+substitutions:
+  _ARTIFACT_LOCATION: gs://${PROJECT_ID}-gb-win31/releases/${BUILD_ID}/

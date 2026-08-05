@@ -1,389 +1,352 @@
 #include <gb/gb.h>
-#include <gb/cgb.h>
-#include <stdio.h>
-#include <string.h> // For memset
+
+#include "assets.h"
+#include "audio.h"
 #include "minesweeper.h"
-#include "sound.h" // For sound effects
-#include "ui.h"    // For clear_screen_area if needed, or direct manipulation
-#include "tiles.h" // For custom tile data and definitions
-#include "../include/app_states.h" // Include app_states.h
+#include "ui.h"
 
-extern void gotoxy(int x, int y); // Explicit declaration
-extern void set_bkg_attributes_xy(UBYTE x, UBYTE y, UBYTE attributes); // Explicit declaration
-extern UINT8 current_app_state;
-extern UINT8 joypad_state;
+#define MS_NO_CELL 0xffu
 
-// --- Custom Random Number Generator (LCG) ---
-static unsigned int next_rand_seed = 1; // GBDK int is 16-bit
+#define MS_BOARD_PIXEL_X (MS_BOARD_TILE_X * 8u)
+#define MS_BOARD_PIXEL_Y (MS_BOARD_TILE_Y * 8u)
+#define MS_BOARD_PIXEL_W (MS_MODEL_WIDTH * 8u)
+#define MS_BOARD_PIXEL_H (MS_MODEL_HEIGHT * 8u)
 
-static void my_srand(unsigned int seed) {
-    next_rand_seed = seed;
-    if (next_rand_seed == 0) next_rand_seed = 1; 
+#define MS_SYSTEM_PIXEL_X 8u
+#define MS_SYSTEM_PIXEL_Y 0u
+#define MS_SYSTEM_PIXEL_W 8u
+#define MS_SYSTEM_PIXEL_H 8u
+
+#define MS_GAME_MENU_PIXEL_X 8u
+#define MS_GAME_MENU_PIXEL_Y 8u
+#define MS_GAME_MENU_PIXEL_W 32u
+#define MS_GAME_MENU_PIXEL_H 8u
+
+#define MS_HELP_MENU_PIXEL_X 56u
+#define MS_HELP_MENU_PIXEL_Y 8u
+#define MS_HELP_MENU_PIXEL_W 32u
+#define MS_HELP_MENU_PIXEL_H 8u
+
+static MinesweeperModel minesweeper;
+static UINT8 focus_x;
+static UINT8 focus_y;
+static UINT8 exploded_cell;
+static UINT8 help_visible;
+static UINT8 rendered_tiles[MS_MODEL_CELL_COUNT];
+static UINT8 rendered_palettes[MS_MODEL_CELL_COUNT];
+static unsigned int next_seed = 0x3101u;
+
+static UINT8 cell_index(UINT8 x, UINT8 y)
+{
+    return (UINT8)(y * MS_MODEL_WIDTH + x);
 }
 
-static unsigned char my_rand(void) {
-    next_rand_seed = (next_rand_seed * 25173 + 13849); // Values from Numerical Recipes (via Wikipedia)
-    return (unsigned char)(next_rand_seed >> 8); 
-}
-// --- End Custom RNG ---
-
-// --- Global Variables for Minesweeper ---
-MinesweeperCell ms_board[MS_BOARD_HEIGHT][MS_BOARD_WIDTH];
-uint8_t ms_cursor_x;
-uint8_t ms_cursor_y;
-uint8_t ms_mines_remaining; // Mines that are not yet flagged
-uint8_t ms_flags_placed;
-uint8_t ms_game_state; // PLAYING, GAME_OVER, WIN
-uint8_t ms_revealed_cells_count;
-uint8_t ms_total_non_mine_cells;
-
-// Sprite number for the cursor
-#define MS_CURSOR_SPRITE_ID 0
-
-// --- Helper Function Prototypes (static) ---
-static void ms_init_board(void);
-static void ms_place_mines(void);
-// static void ms_load_custom_tiles(void); // Tiles are loaded globally by load_all_tiles()
-static void ms_update_cursor_sprite_pos(void);
-static void ms_calculate_adjacent_mines(void);
-static uint8_t ms_count_cell_adjacent_mines(uint8_t r, uint8_t c);
-static void ms_draw_board(void);
-static void ms_draw_status_bar(void);
-static void ms_reveal_cell(uint8_t r, uint8_t c);
-static void ms_toggle_flag(uint8_t r, uint8_t c);
-static void ms_check_win_condition(void);
-static void ms_game_over_sequence(uint8_t won);
-static void ms_clear_game_area(void);
-static void ms_update_mine_count_display(uint8_t count);
-
-// --- Core Game Logic Implementation ---
-
-static void ms_update_cursor_sprite_pos(void) {
-    uint8_t screen_px, screen_py;
-    screen_px = (MS_BOARD_X_OFFSET + ms_cursor_x) * 8 + 8;
-    screen_py = (MS_BOARD_Y_OFFSET + ms_cursor_y) * 8 + 16;
-    move_sprite(MS_CURSOR_SPRITE_ID, screen_px, screen_py);
+static UINT8 focused_cell(void)
+{
+    return cell_index(focus_x, focus_y);
 }
 
-UINT8 start_minesweeper(void) {
-    uint8_t current_joypad = 0, previous_joypad = 0;
+static UINT8 tile_for_cell(UINT8 index)
+{
+    const MinesweeperModelCell *cell;
 
-    DISPLAY_ON;
-    SPRITES_8x8;
-    SHOW_SPRITES;
-    SHOW_BKG;
+    cell = minesweeper_model_get_cell(
+        &minesweeper,
+        (UINT8)(index % MS_MODEL_WIDTH),
+        (UINT8)(index / MS_MODEL_WIDTH)
+    );
+    if (cell == (const MinesweeperModelCell *)0) return TILE_BLANK;
 
-    set_sprite_tile(MS_CURSOR_SPRITE_ID, SPRITE_IDX_MS_CURSOR);
-
-    my_srand(DIV_REG); // Seed with DIV_REG, which changes frequently
-    ms_init_board();
-    ms_game_state = MS_GAME_STATE_PLAYING;
-    ms_update_cursor_sprite_pos();
-
-    while(1) {
-        previous_joypad = current_joypad;
-        current_joypad = joypad();
-        uint8_t pressed_joypad = (current_joypad & ~previous_joypad);
-
-        if (ms_game_state == MS_GAME_STATE_PLAYING) {
-            uint8_t old_cursor_x = ms_cursor_x;
-            uint8_t old_cursor_y = ms_cursor_y;
-            uint8_t board_updated = 0;
-            uint8_t cursor_moved = 0;
-
-            if (pressed_joypad & J_LEFT) {
-                if (ms_cursor_x > 0) ms_cursor_x--;
-                cursor_moved = 1;
-            }
-            if (pressed_joypad & J_RIGHT) {
-                if (ms_cursor_x < MS_BOARD_WIDTH - 1) ms_cursor_x++;
-                cursor_moved = 1;
-            }
-            if (pressed_joypad & J_UP) {
-                if (ms_cursor_y > 0) ms_cursor_y--;
-                cursor_moved = 1;
-            }
-            if (pressed_joypad & J_DOWN) {
-                if (ms_cursor_y < MS_BOARD_HEIGHT - 1) ms_cursor_y++;
-                cursor_moved = 1;
-            }
-
-            if (cursor_moved) {
-                ms_update_cursor_sprite_pos();
-                play_sound(SFX_CURSOR_MOVE);
-            }
-
-            if (pressed_joypad & J_A) {
-                if (!ms_board[ms_cursor_y][ms_cursor_x].is_flagged && !ms_board[ms_cursor_y][ms_cursor_x].is_revealed) {
-                    ms_reveal_cell(ms_cursor_y, ms_cursor_x);
-                    play_sound(SFX_REVEAL_EMPTY); // Corrected: Was SFX_REVEAL_TILE, use SFX_REVEAL_EMPTY
-                }
-                board_updated = 1; 
-            }
-            if (pressed_joypad & J_B) {
-                ms_toggle_flag(ms_cursor_y, ms_cursor_x);
-                play_sound(SFX_PLACE_FLAG); // Corrected: Was SFX_FLAG_MINE, use SFX_PLACE_FLAG
-                board_updated = 1;
-            }
-
-            if (board_updated) {
-                ms_draw_board(); 
-            }
-
-        } else { 
-            if (pressed_joypad & (J_A | J_START)) {
-                ms_init_board();
-                ms_game_state = MS_GAME_STATE_PLAYING;
-                ms_update_cursor_sprite_pos();
-            }
+    if (cell->is_revealed) {
+        if (cell->is_mine) {
+            return (index == exploded_cell) ? TILE_MS_EXPLODED : TILE_MS_MINE;
         }
-
-        if (pressed_joypad & J_SELECT) { 
-            ms_clear_game_area();
-            HIDE_SPRITES;
-            return APP_STATE_HOME;
+        if (cell->adjacent_mines != 0u) {
+            return (UINT8)(TILE_MS_NUM_1 + cell->adjacent_mines - 1u);
         }
-        wait_vbl_done();
+        return TILE_BLANK;
+    }
+
+    if (cell->is_flagged ||
+        (minesweeper_model_is_won(&minesweeper) && cell->is_mine)) {
+        return TILE_MS_FLAG;
+    }
+    return TILE_MS_HIDDEN;
+}
+
+static UINT8 palette_for_cell(UINT8 index)
+{
+    return (index == focused_cell()) ? PAL_GAME_FOCUS : PAL_GAME;
+}
+
+static void draw_cell(UINT8 index)
+{
+    UINT8 tile;
+    UINT8 palette;
+    UINT8 x;
+    UINT8 y;
+
+    tile = tile_for_cell(index);
+    palette = palette_for_cell(index);
+    if (rendered_tiles[index] == tile &&
+        rendered_palettes[index] == palette) return;
+
+    x = (UINT8)(index % MS_MODEL_WIDTH);
+    y = (UINT8)(index / MS_MODEL_WIDTH);
+    ui_set_tile(
+        (UINT8)(MS_BOARD_TILE_X + x),
+        (UINT8)(MS_BOARD_TILE_Y + y),
+        tile,
+        palette
+    );
+    rendered_tiles[index] = tile;
+    rendered_palettes[index] = palette;
+}
+
+static void draw_changed_cells(void)
+{
+    UINT8 index;
+
+    for (index = 0u; index < MS_MODEL_CELL_COUNT; ++index) {
+        draw_cell(index);
     }
 }
 
-static void ms_clear_game_area(void) {
-    unsigned char blank_tile_idx = MINESWEEPER_TILE_VRAM_OFFSET + TILE_IDX_MS_EMPTY_REVEALED;
-    unsigned char blank_tile_data[1];
-    blank_tile_data[0] = blank_tile_idx;
+static void invalidate_board(void)
+{
+    UINT8 index;
 
-    for (uint8_t y_tile = MS_STATUS_Y; y_tile < MS_SCREEN_Y_MAX; ++y_tile) {
-        for (uint8_t x_tile = MS_SCREEN_X_MIN; x_tile < MS_SCREEN_X_MAX; ++x_tile) {
-            set_bkg_tiles(x_tile, y_tile, 1, 1, blank_tile_data);
-        }
+    for (index = 0u; index < MS_MODEL_CELL_COUNT; ++index) {
+        rendered_tiles[index] = 0xffu;
+        rendered_palettes[index] = 0xffu;
     }
 }
 
-static void ms_init_board(void) {
-    ms_cursor_x = 0;
-    ms_cursor_y = 0;
-    ms_mines_remaining = MS_NUM_MINES;
-    ms_flags_placed = 0;
-    ms_revealed_cells_count = 0;
-    ms_total_non_mine_cells = (MS_BOARD_WIDTH * MS_BOARD_HEIGHT) - MS_NUM_MINES;
-    ms_game_state = MS_GAME_STATE_PLAYING;
-
-    for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-        for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-            ms_board[r][c].is_mine = 0;
-            ms_board[r][c].is_revealed = 0;
-            ms_board[r][c].is_flagged = 0;
-            ms_board[r][c].adjacent_mines = 0;
-        }
-    }
-    ms_place_mines();
-    ms_calculate_adjacent_mines();
-    ms_clear_game_area(); 
-    ms_draw_board();
-    ms_draw_status_bar();
+static void set_two_digits(char *text, UINT8 offset, UINT8 value)
+{
+    text[offset] = (char)('0' + (value / 10u));
+    text[(UINT8)(offset + 1u)] = (char)('0' + (value % 10u));
 }
 
-static void ms_place_mines(void) {
-    uint8_t mines_placed = 0;
-    uint8_t r, c;
-    while (mines_placed < MS_NUM_MINES) {
-        r = my_rand() % MS_BOARD_HEIGHT;
-        c = my_rand() % MS_BOARD_WIDTH;
-        if (!ms_board[r][c].is_mine) {
-            ms_board[r][c].is_mine = 1;
-            mines_placed++;
-        }
+static void draw_status(void)
+{
+    char status_text[] = "MINES:00 FLAGS:00";
+    UINT8 flags;
+    UINT8 remaining;
+
+    if (minesweeper_model_is_won(&minesweeper)) {
+        flags = MS_MODEL_MINE_COUNT;
+        remaining = 0u;
+    } else {
+        flags = minesweeper_model_get_flag_count(&minesweeper);
+        remaining = (UINT8)(MS_MODEL_MINE_COUNT - flags);
     }
+
+    set_two_digits(status_text, 6u, remaining);
+    set_two_digits(status_text, 15u, flags);
+    ui_text_clipped(1u, 3u, status_text, PAL_WINDOW, 18u);
 }
 
-static uint8_t ms_count_cell_adjacent_mines(uint8_t r, uint8_t c) {
-    uint8_t count = 0;
-    for (int8_t dr = -1; dr <= 1; ++dr) {
-        for (int8_t dc = -1; dc <= 1; ++dc) {
-            if (dr == 0 && dc == 0) continue;
-            uint8_t nr = r + dr;
-            uint8_t nc = c + dc;
-            if (nr < MS_BOARD_HEIGHT && nc < MS_BOARD_WIDTH) { 
-                if (ms_board[nr][nc].is_mine) {
-                    count++;
-                }
-            }
-        }
+static void draw_help(void)
+{
+    const char *message;
+
+    if (minesweeper_model_is_won(&minesweeper)) {
+        message = "YOU WIN!";
+    } else if (minesweeper_model_is_lost(&minesweeper)) {
+        message = "GAME OVER";
+    } else if (help_visible) {
+        message = "SELECT:NEXT CELL";
+    } else {
+        message = "CLEAR ALL SAFE TILES";
     }
-    return count;
+
+    ui_text_clipped(1u, 14u, message, PAL_WINDOW, 18u);
+    ui_text_clipped(1u, 15u, "A:OPEN  B:FLAG", PAL_WINDOW, 18u);
+    ui_text_clipped(1u, 16u, "ST:EXIT SEL:NEXT", PAL_WINDOW, 18u);
 }
 
-static void ms_calculate_adjacent_mines(void) {
-    for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-        for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-            if (!ms_board[c][c].is_mine) {
-                ms_board[r][c].adjacent_mines = ms_count_cell_adjacent_mines(r, c);
-            }
-        }
-    }
+static void move_pointer_to_focus(void)
+{
+    pointer_move_to(
+        (UINT8)((MS_BOARD_TILE_X + focus_x) * 8u + 3u),
+        (UINT8)((MS_BOARD_TILE_Y + focus_y) * 8u + 3u)
+    );
 }
 
-static void ms_draw_status_bar(void) {
-    char status_buf[20]; 
-    
-    fill_bkg_rect_attributes(MS_STATUS_X, MS_STATUS_Y, 19, 1, PAL_IDX_BG_MINESWEEPER);
+static void set_focus(UINT8 index, UINT8 move_pointer)
+{
+    UINT8 previous;
 
-    unsigned char space_char[1]; space_char[0] = ' '; 
-    for(uint8_t i = 0; i < 19; ++i) { 
-         set_bkg_tiles(MS_STATUS_X + i, MS_STATUS_Y, 1, 1, space_char);
-    }
+    if (index >= MS_MODEL_CELL_COUNT) return;
+    previous = focused_cell();
+    focus_x = (UINT8)(index % MS_MODEL_WIDTH);
+    focus_y = (UINT8)(index / MS_MODEL_WIDTH);
 
-    if (ms_game_state == MS_GAME_STATE_PLAYING) {
-        sprintf(status_buf, "Mines:%02u Flags:%02u", (unsigned int)ms_mines_remaining, (unsigned int)ms_flags_placed);
-    } else if (ms_game_state == MS_GAME_STATE_GAME_OVER) {
-        sprintf(status_buf, "GAME OVER! (A/St)");
-    } else if (ms_game_state == MS_GAME_STATE_WIN) {
-        sprintf(status_buf, "YOU WIN! (A/Strt)");
+    if (previous != index) {
+        draw_cell(previous);
+        draw_cell(index);
     }
-    gotoxy(MS_STATUS_X, MS_STATUS_Y);
-    printf("%s", status_buf);
+    if (move_pointer) move_pointer_to_focus();
 }
 
-static void ms_draw_board(void) {
-    fill_bkg_rect_attributes(MS_BOARD_X_OFFSET, MS_BOARD_Y_OFFSET, MS_BOARD_WIDTH, MS_BOARD_HEIGHT, PAL_IDX_BG_MINESWEEPER);
-    
-    unsigned char tile_to_draw_data[1];
+static UINT8 hovered_cell(void)
+{
+    const PointerState *pointer;
+    UINT8 x;
+    UINT8 y;
 
-    for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-        for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-            uint8_t screen_x = c + MS_BOARD_X_OFFSET;
-            uint8_t screen_y = r + MS_BOARD_Y_OFFSET;
-            uint8_t tile_idx;
+    if (!pointer_hits(
+            MS_BOARD_PIXEL_X,
+            MS_BOARD_PIXEL_Y,
+            MS_BOARD_PIXEL_W,
+            MS_BOARD_PIXEL_H
+        )) return MS_NO_CELL;
 
-            if (ms_board[r][c].is_revealed) {
-                if (ms_board[r][c].is_mine) {
-                    tile_idx = TILE_IDX_MS_CLICKED_MINE;
-                } else if (ms_board[r][c].adjacent_mines > 0) {
-                    tile_idx = TILE_IDX_MS_NUM_1 + (ms_board[r][c].adjacent_mines - 1);
-                } else {
-                    tile_idx = TILE_IDX_MS_EMPTY_REVEALED;
-                }
-            } else if (ms_board[r][c].is_flagged) {
-                tile_idx = TILE_IDX_MS_FLAG;
-            } else {
-                if (ms_game_state == MS_GAME_STATE_GAME_OVER && ms_board[r][c].is_mine) {
-                    tile_idx = TILE_IDX_MS_MINE;
-                } else {
-                    tile_idx = TILE_IDX_MS_HIDDEN;
-                }
-            }
-            
-            tile_to_draw_data[0] = MINESWEEPER_TILE_VRAM_OFFSET + tile_idx;
-            set_bkg_tiles(screen_x, screen_y, 1, 1, tile_to_draw_data);
-            set_bkg_attributes_xy(screen_x, screen_y, PAL_IDX_BG_MINESWEEPER);
-        }
-    }
+    pointer = pointer_get();
+    x = (UINT8)((pointer->x - MS_BOARD_PIXEL_X) / 8u);
+    y = (UINT8)((pointer->y - MS_BOARD_PIXEL_Y) / 8u);
+    return cell_index(x, y);
 }
 
-static void ms_reveal_cell(uint8_t r, uint8_t c) {
-    if (r >= MS_BOARD_HEIGHT || c >= MS_BOARD_WIDTH) return;
-    if (ms_board[r][c].is_revealed || ms_board[r][c].is_flagged) return;
+static void start_new_board(void)
+{
+    minesweeper_model_init(&minesweeper, next_seed);
+    next_seed = (unsigned int)((next_seed + 0x9e37u) & 65535u);
+    exploded_cell = MS_NO_CELL;
+    help_visible = 0u;
+    focus_x = (UINT8)(MS_MODEL_WIDTH / 2u);
+    focus_y = (UINT8)(MS_MODEL_HEIGHT / 2u);
+    move_pointer_to_focus();
+    draw_changed_cells();
+    draw_status();
+    draw_help();
+}
 
-    ms_board[r][c].is_revealed = 1;
+static void apply_reveal(void)
+{
+    UINT8 action;
+    UINT8 index;
 
-    if (ms_board[r][c].is_mine) {
-        ms_game_state = MS_GAME_STATE_GAME_OVER;
-        ms_game_over_sequence(0); 
-        play_sound(SFX_REVEAL_MINE); // Corrected: Was SFX_GAME_OVER, use SFX_REVEAL_MINE
+    index = focused_cell();
+    action = minesweeper_model_reveal(&minesweeper, focus_x, focus_y);
+    if (action == MS_MODEL_ACTION_NONE) {
+        audio_sfx(SFX_ERROR);
         return;
     }
 
-    ms_revealed_cells_count++;
-
-    if (ms_board[r][c].adjacent_mines == 0) {
-        for (int8_t dr = -1; dr <= 1; ++dr) {
-            for (int8_t dc = -1; dc <= 1; ++dc) {
-                if (dr == 0 && dc == 0) continue;
-                uint8_t nr = r + dr;
-                uint8_t nc = c + dc;
-                if (nr < MS_BOARD_HEIGHT && nc < MS_BOARD_WIDTH) {
-                     ms_reveal_cell(nr, nc); 
-                }
-            }
-        }
+    help_visible = 0u;
+    if (action == MS_MODEL_ACTION_LOST) {
+        exploded_cell = index;
+        audio_sfx(SFX_ERROR);
+    } else if (action == MS_MODEL_ACTION_WON) {
+        audio_sfx(SFX_WIN);
     } else {
-        set_bkg_tile_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, TILE_IDX_MS_NUM_1 + (ms_board[r][c].adjacent_mines - 1));
-        set_bkg_attributes_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, PAL_IDX_BG_MINESWEEPER);
+        audio_sfx(SFX_CLICK);
     }
-    ms_check_win_condition();
+    draw_changed_cells();
+    draw_status();
+    draw_help();
 }
 
-static void ms_toggle_flag(uint8_t r, uint8_t c) {
-    if (ms_board[r][c].is_revealed) return; 
+static void apply_flag(void)
+{
+    UINT8 action;
 
-    if (ms_board[r][c].is_flagged) {
-        ms_board[r][c].is_flagged = 0;
-        ms_flags_placed--;
-        if(ms_board[r][c].is_mine) ms_mines_remaining++; 
-        play_sound(SFX_PLACE_FLAG); // Corrected: Was SFX_FLAG_MINE, use SFX_PLACE_FLAG
-    } else {
-        ms_board[r][c].is_flagged = 1;
-        ms_flags_placed++;
-        if(ms_board[r][c].is_mine) ms_mines_remaining--; 
-        play_sound(SFX_PLACE_FLAG); // Corrected: Was SFX_FLAG_MINE, use SFX_PLACE_FLAG
-    }
-    ms_check_win_condition();
-}
-
-static void ms_check_win_condition(void) {
-    if (ms_game_state != MS_GAME_STATE_PLAYING) return;
-
-    if (ms_revealed_cells_count == ms_total_non_mine_cells) {
-        ms_game_state = MS_GAME_STATE_WIN;
-        ms_game_over_sequence(1); 
-        play_sound(SFX_WIN_GAME); // Corrected: Was SFX_GAME_WIN, use SFX_WIN_GAME
+    action = minesweeper_model_toggle_flag(
+        &minesweeper,
+        focus_x,
+        focus_y
+    );
+    if (action == MS_MODEL_ACTION_NONE) {
+        audio_sfx(SFX_ERROR);
         return;
     }
-    
-    if (ms_mines_remaining == 0 && ms_flags_placed == MS_NUM_MINES) {
-        uint8_t correctly_flagged_mines = 0;
-        for(uint8_t r_idx = 0; r_idx < MS_BOARD_HEIGHT; ++r_idx){
-            for(uint8_t c_idx = 0; c_idx < MS_BOARD_WIDTH; ++c_idx){
-                if(ms_board[r_idx][c_idx].is_mine && ms_board[r_idx][c_idx].is_flagged){
-                    correctly_flagged_mines++;
-                }
-            }
-        }
-        if(correctly_flagged_mines == MS_NUM_MINES){
-            ms_game_state = MS_GAME_STATE_WIN;
-            ms_game_over_sequence(1);
-            play_sound(SFX_WIN_GAME); // Corrected: Was SFX_GAME_WIN, use SFX_WIN_GAME
-            return;
-        }
-    }
+
+    help_visible = 0u;
+    audio_sfx(SFX_CLICK);
+    draw_changed_cells();
+    draw_status();
+    draw_help();
 }
 
-static void ms_game_over_sequence(uint8_t won) {
-    play_sound(won ? SFX_WIN_GAME : SFX_REVEAL_MINE); // Corrected: Was SFX_GAME_WIN and SFX_GAME_OVER, use SFX_WIN_GAME and SFX_REVEAL_MINE
-    if (!won) {
-        for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-            for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-                if (ms_board[r][c].is_mine && !ms_board[r][c].is_revealed) {
-                    ms_board[r][c].is_revealed = 1; // Reveal unrevealed mines on loss
-                }
-            }
-        }
-    } else { 
-        for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-            for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-                if (ms_board[r][c].is_mine && !ms_board[r][c].is_flagged) {
-                    ms_board[r][c].is_flagged = 1; 
-                }
-            }
-        }
-        ms_flags_placed = MS_NUM_MINES;
-        ms_mines_remaining = 0;
-    }
-    ms_draw_board(); 
+void minesweeper_enter(void)
+{
+    ui_scene_begin();
+    ui_clear(PAL_DESKTOP);
+    ui_window(0u, 0u, 20u, 18u, "GB SWEEPER", 1u);
+    ui_menu(1u, 1u, 18u, "GAME  HELP");
+    invalidate_board();
+    pointer_reset(80u, 72u);
+    start_new_board();
+    pointer_show();
+    ui_scene_end();
 }
 
-static void ms_update_mine_count_display(uint8_t count) {
-    gotoxy(MS_MINE_COUNT_X_TILES, MS_MINE_COUNT_Y_TILES);
-    fill_bkg_rect_attributes(MS_MINE_COUNT_X_TILES, MS_MINE_COUNT_Y_TILES, 7, 1, PAL_IDX_BG_MINESWEEPER); // Cover text area
-    printf("Mines:%d ", count); // Added colon, ensure spacing fits
+AppState minesweeper_update(const InputState *input)
+{
+    UINT8 hover;
+    UINT8 next_focus;
+
+    if (input->pressed & J_START) {
+        audio_sfx(SFX_CLICK);
+        pointer_hide();
+        return APP_DESKTOP;
+    }
+
+    pointer_update(input);
+    hover = hovered_cell();
+    if (hover != MS_NO_CELL && hover != focused_cell()) {
+        set_focus(hover, 0u);
+    }
+
+    if (input->pressed & J_SELECT) {
+        next_focus = (UINT8)(focused_cell() + 1u);
+        if (next_focus >= MS_MODEL_CELL_COUNT) next_focus = 0u;
+        set_focus(next_focus, 1u);
+        hover = next_focus;
+        audio_sfx(SFX_MOVE);
+    }
+
+    if (input->pressed & J_A) {
+        if (pointer_hits(
+                MS_SYSTEM_PIXEL_X,
+                MS_SYSTEM_PIXEL_Y,
+                MS_SYSTEM_PIXEL_W,
+                MS_SYSTEM_PIXEL_H
+            )) {
+            audio_sfx(SFX_CLICK);
+            pointer_hide();
+            return APP_DESKTOP;
+        }
+        if (pointer_hits(
+                MS_GAME_MENU_PIXEL_X,
+                MS_GAME_MENU_PIXEL_Y,
+                MS_GAME_MENU_PIXEL_W,
+                MS_GAME_MENU_PIXEL_H
+            )) {
+            start_new_board();
+            audio_sfx(SFX_CLICK);
+            return APP_SWEEPER;
+        }
+        if (pointer_hits(
+                MS_HELP_MENU_PIXEL_X,
+                MS_HELP_MENU_PIXEL_Y,
+                MS_HELP_MENU_PIXEL_W,
+                MS_HELP_MENU_PIXEL_H
+            )) {
+            help_visible = (UINT8)!help_visible;
+            draw_help();
+            audio_sfx(SFX_CLICK);
+            return APP_SWEEPER;
+        }
+        if (hover != MS_NO_CELL) {
+            apply_reveal();
+        } else {
+            audio_sfx(SFX_ERROR);
+        }
+    }
+
+    if (input->pressed & J_B) apply_flag();
+    return APP_SWEEPER;
 }
