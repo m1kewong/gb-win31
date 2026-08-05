@@ -1,157 +1,293 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
-#include <stdio.h>
-#include <string.h> // For memcpy
+#include <string.h>
+
+#include "assets.h"
+#include "audio.h"
 #include "paint.h"
-#include "tiles.h"
-#include "ui.h" // For APP_STATE_HOME
-#include "sound.h" // For sound effects
-#include "../include/tiles.h" // For TILE_IDX constants and palette constants
-#include "../include/app_states.h" // Include app_states.h
+#include "ui.h"
 
-extern void gotoxy(int x, int y); // Explicit declaration
-extern void set_bkg_attributes_xy(UBYTE x, UBYTE y, UBYTE attributes); // Explicit declaration
-extern UINT8 current_app_state;
-extern UINT8 joypad_state;
+#define PAINT_CANVAS_X_TILES 3u
+#define PAINT_CANVAS_Y_TILES 4u
+#define PAINT_CANVAS_X_PIXELS (PAINT_CANVAS_X_TILES * 8u)
+#define PAINT_CANVAS_Y_PIXELS (PAINT_CANVAS_Y_TILES * 8u)
+#define PAINT_CANVAS_WIDTH_PIXELS (PAINT_CANVAS_WIDTH_TILES * 8u)
+#define PAINT_CANVAS_HEIGHT_PIXELS (PAINT_CANVAS_HEIGHT_TILES * 8u)
 
-// --- Global variables for Paint ---
-static PaintCursorPosition cursor;
-static UINT8 current_paint_color_idx; // 0 for Black, 1 for White
-static char text_buffer_paint[20]; // Buffer for printf_at
+#define PAINT_TILE_BYTES 16u
+#define PAINT_CANVAS_TILE_COUNT \
+    (PAINT_CANVAS_WIDTH_TILES * PAINT_CANVAS_HEIGHT_TILES)
+#define PAINT_CANVAS_BYTES (PAINT_CANVAS_TILE_COUNT * PAINT_TILE_BYTES)
 
-// Define the actual tile indices to be used for drawing
-#define PAINT_DRAW_COLOR_BLACK TILE_IDX_EMPTY_BLACK
-#define PAINT_DRAW_COLOR_WHITE TILE_IDX_EMPTY_WHITE
+/* Bank 1 has its own tile-number namespace, so zero does not alias the font. */
+#define PAINT_CANVAS_VRAM_BASE 0u
+#define PAINT_SWATCH_VRAM_BASE PAINT_CANVAS_TILE_COUNT
+#define PAINT_SHADE_COUNT 4u
+#define PAINT_CLEAR_TILES_PER_FRAME 4u
 
-static const UINT8 available_draw_tiles[] = {
-    PAINT_DRAW_COLOR_BLACK,
-    PAINT_DRAW_COLOR_WHITE
+#define PAINT_PRIMARY_SWATCH_X 3u
+#define PAINT_SECONDARY_SWATCH_X 7u
+#define PAINT_SWATCH_Y 2u
+
+typedef char paint_tiles_must_fit_vram_bank[
+    ((PAINT_SWATCH_VRAM_BASE + PAINT_SHADE_COUNT) <= 256u) ? 1 : -1
+];
+
+/* 140 independent 8x8, 2bpp tiles. This consumes 2,240 bytes of WRAM. */
+static UINT8 paint_canvas[PAINT_CANVAS_BYTES];
+
+static UINT8 paint_initialized;
+static UINT8 paint_primary_shade;
+static UINT8 paint_secondary_shade;
+static UINT8 paint_clear_pending;
+static UINT8 paint_clear_next_tile;
+
+/* Four solid 2bpp tiles, one for each shade in PAL_MONO. */
+static const UINT8 paint_swatch_tiles[PAINT_SHADE_COUNT * PAINT_TILE_BYTES] = {
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0xffu, 0x00u, 0xffu, 0x00u, 0xffu, 0x00u, 0xffu, 0x00u,
+    0xffu, 0x00u, 0xffu, 0x00u, 0xffu, 0x00u, 0xffu, 0x00u,
+    0x00u, 0xffu, 0x00u, 0xffu, 0x00u, 0xffu, 0x00u, 0xffu,
+    0x00u, 0xffu, 0x00u, 0xffu, 0x00u, 0xffu, 0x00u, 0xffu,
+    0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu,
+    0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu, 0xffu
 };
-#define NUM_AVAILABLE_DRAW_COLORS (sizeof(available_draw_tiles) / sizeof(available_draw_tiles[0]))
 
-// --- Helper Functions ---
-
-// Initialize or refresh the paint canvas background
-static void paint_draw_canvas_area(void) {
-    fill_bkg_rect((UINT8)PAINT_CANVAS_X, (UINT8)PAINT_CANVAS_Y, (UINT8)PAINT_CANVAS_WIDTH, (UINT8)PAINT_CANVAS_HEIGHT, (UINT8)TILE_IDX_EMPTY_WHITE); // Default to white canvas
-    fill_bkg_rect_attributes((UINT8)PAINT_CANVAS_X, (UINT8)PAINT_CANVAS_Y, (UINT8)PAINT_CANVAS_WIDTH, (UINT8)PAINT_CANVAS_HEIGHT, (UINT8)PAL_IDX_BG_PAINT);
+static UINT16 paint_tile_offset(UINT8 tile)
+{
+    return (UINT16)tile * PAINT_TILE_BYTES;
 }
 
-// Draw the Paint UI (color palette, tool icons)
-static void paint_draw_ui(void) {
-    fill_bkg_rect((UINT8)PAINT_UI_X, (UINT8)PAINT_UI_Y, (UINT8)PAINT_UI_WIDTH, (UINT8)PAINT_UI_HEIGHT, (UINT8)TILE_IDX_EMPTY_GREY); 
-    fill_bkg_rect_attributes((UINT8)PAINT_UI_X, (UINT8)PAINT_UI_Y, (UINT8)PAINT_UI_WIDTH, (UINT8)PAINT_UI_HEIGHT, (UINT8)PAL_IDX_BG_PAINT);
-
-    sprintf(text_buffer_paint, "Color: ");
-    gotoxy(1, PAINT_UI_Y);
-    printf("%s", text_buffer_paint);
-    set_bkg_tile_xy(1 + (UINT8)strlen(text_buffer_paint), PAINT_UI_Y, available_draw_tiles[0]); // Black swatch
-    set_bkg_attributes_xy(1 + (UINT8)strlen(text_buffer_paint), PAINT_UI_Y, PAL_IDX_BG_PAINT);
-    set_bkg_tile_xy(1 + (UINT8)strlen(text_buffer_paint) + 1, PAINT_UI_Y, available_draw_tiles[1]); // White swatch
-    set_bkg_attributes_xy(1 + (UINT8)strlen(text_buffer_paint) + 1, PAINT_UI_Y, PAL_IDX_BG_PAINT);
-    
-    // Indicate selected swatch (e.g. by drawing a small frame or different tile under it)
-    if(current_paint_color_idx == 0) {
-        gotoxy(1 + (UINT8)strlen(text_buffer_paint) - 1, PAINT_UI_Y);
-    } else {
-        gotoxy(1 + (UINT8)strlen(text_buffer_paint), PAINT_UI_Y);
-    }
-    printf(">");
-
-    gotoxy(1, PAINT_UI_Y + 1);
-    printf("A:Draw SEL:Swap START:Exit");
+static void paint_upload_canvas(void)
+{
+    VBK_REG = VBK_BANK_1;
+    set_bkg_data(PAINT_CANVAS_VRAM_BASE, PAINT_CANVAS_TILE_COUNT,
+                 paint_canvas);
+    set_bkg_data(PAINT_SWATCH_VRAM_BASE, PAINT_SHADE_COUNT,
+                 paint_swatch_tiles);
+    VBK_REG = VBK_BANK_0;
 }
 
-// Update cursor position on screen
-void update_paint_cursor_sprite(void) {
-    move_sprite(SPRITE_IDX_PAINT_CURSOR, cursor.x_px + 8, cursor.y_px + 16); // Offset by 8,16 for screen origin
+static void paint_upload_tile(UINT8 tile)
+{
+    VBK_REG = VBK_BANK_1;
+    set_bkg_data((UINT8)(PAINT_CANVAS_VRAM_BASE + tile), 1u,
+                 &paint_canvas[paint_tile_offset(tile)]);
+    VBK_REG = VBK_BANK_0;
 }
 
-// Handle drawing on the canvas
-void paint_at_cursor(void) {
-    // Convert pixel coordinates to tile coordinates within the canvas
-    UINT8 canvas_tile_x = (cursor.x_px / 8);
-    UINT8 canvas_tile_y = (cursor.y_px / 8);
+static void paint_upload_tile_range(UINT8 first, UINT8 count)
+{
+    VBK_REG = VBK_BANK_1;
+    set_bkg_data((UINT8)(PAINT_CANVAS_VRAM_BASE + first), count,
+                 &paint_canvas[paint_tile_offset(first)]);
+    VBK_REG = VBK_BANK_0;
+}
 
-    // Check bounds
-    if (canvas_tile_x < PAINT_CANVAS_WIDTH && canvas_tile_y < PAINT_CANVAS_HEIGHT) {
-        UINT8 screen_tile_x = PAINT_CANVAS_X + canvas_tile_x;
-        UINT8 screen_tile_y = PAINT_CANVAS_Y + canvas_tile_y;
+static void paint_map_bank_one_tile(UINT8 x, UINT8 y, UINT8 tile)
+{
+    set_bkg_tile_xy(x, y, tile);
+    set_bkg_attribute_xy(x, y, (UINT8)(BKGF_BANK1 | PAL_MONO));
+}
 
-        set_bkg_tile_xy(screen_tile_x, screen_tile_y, available_draw_tiles[current_paint_color_idx]);
-        set_bkg_attributes_xy(screen_tile_x, screen_tile_y, PAL_IDX_BG_PAINT);
+static void paint_map_canvas(void)
+{
+    UINT8 x;
+    UINT8 y;
+    UINT8 tile = PAINT_CANVAS_VRAM_BASE;
+
+    for (y = 0u; y != PAINT_CANVAS_HEIGHT_TILES; ++y) {
+        for (x = 0u; x != PAINT_CANVAS_WIDTH_TILES; ++x) {
+            paint_map_bank_one_tile((UINT8)(PAINT_CANVAS_X_TILES + x),
+                                    (UINT8)(PAINT_CANVAS_Y_TILES + y),
+                                    tile);
+            ++tile;
+        }
     }
 }
 
-// --- Main Paint Application Function ---
-UINT8 start_paint(void) {
-    // Initialization
-    // Set palettes for Paint - loaded globally in main.c
-    // Ensure attributes are set correctly when drawing.
+static void paint_draw_canvas_frame(void)
+{
+    UINT8 x;
+    UINT8 y;
 
-    set_sprite_tile((UINT8)SPRITE_IDX_PAINT_CURSOR, (UINT8)SPRITE_IDX_PAINT_CURSOR); // Assign tile to sprite
-    set_sprite_prop((UINT8)SPRITE_IDX_PAINT_CURSOR, (UINT8)PAL_IDX_SPRITE_PAINT_CURSOR); // Assign palette to sprite
+    ui_set_tile(2u, 3u, TILE_FRAME_TL, PAL_WINDOW);
+    ui_set_tile(17u, 3u, TILE_FRAME_TR, PAL_WINDOW);
+    ui_set_tile(2u, 14u, TILE_FRAME_BL, PAL_WINDOW);
+    ui_set_tile(17u, 14u, TILE_FRAME_BR, PAL_WINDOW);
 
-    // Initialize cursor
-    cursor.x_px = (PAINT_CANVAS_WIDTH * 8) / 2;  // Center of canvas
-    cursor.y_px = (PAINT_CANVAS_HEIGHT * 8) / 2; // Center of canvas
-    current_paint_color_idx = 0; // Default to first color (e.g., black)
+    for (x = 3u; x != 17u; ++x) {
+        ui_set_tile(x, 3u, TILE_FRAME_T, PAL_WINDOW);
+        ui_set_tile(x, 14u, TILE_FRAME_B, PAL_WINDOW);
+    }
+    for (y = 4u; y != 14u; ++y) {
+        ui_set_tile(2u, y, TILE_FRAME_L, PAL_WINDOW);
+        ui_set_tile(17u, y, TILE_FRAME_R, PAL_WINDOW);
+    }
+}
 
-    paint_draw_canvas_area();
-    paint_draw_ui();
-    update_paint_cursor_sprite();
+static void paint_draw_swatches(void)
+{
+    paint_map_bank_one_tile(PAINT_PRIMARY_SWATCH_X, PAINT_SWATCH_Y,
+                            (UINT8)(PAINT_SWATCH_VRAM_BASE + paint_primary_shade));
+    paint_map_bank_one_tile(PAINT_SECONDARY_SWATCH_X, PAINT_SWATCH_Y,
+                            (UINT8)(PAINT_SWATCH_VRAM_BASE + paint_secondary_shade));
+}
 
-    SHOW_BKG;
-    SHOW_SPRITES;
-    DISPLAY_ON;
+static void paint_draw_controls(void)
+{
+    ui_text_clipped(1u, 15u, "SEL:A  A+B:CLEAR", PAL_WINDOW, 18u);
+    ui_text_clipped(1u, 16u, "START:DESKTOP", PAL_WINDOW, 18u);
+}
 
-    UINT8 current_paint_state = PAINT_STATE_DRAWING; // Use a local paint state for loop control
-    UINT8 previous_joypad_state = 0; // Initialize previous joypad state
+static void paint_draw_chrome(void)
+{
+    ui_clear(PAL_DESKTOP);
+    ui_window(0u, 0u, 20u, 18u, "GB PAINT", 1u);
+    ui_menu(1u, 1u, 18u, "FILE  HELP");
+    ui_text(1u, 2u, "A:", PAL_WINDOW);
+    ui_text(5u, 2u, "B:", PAL_WINDOW);
+    ui_text(9u, 2u, "SELECT=A", PAL_WINDOW);
+    paint_draw_canvas_frame();
+    paint_draw_controls();
+}
 
-    while (current_paint_state != PAINT_STATE_EXIT) {
-        // Handle input
-        previous_joypad_state = joypad_state;
-        joypad_state = joypad();
-        UINT8 pressed_joypad = (joypad_state & ~previous_joypad_state);
+static UINT8 paint_set_pixel(UINT8 x, UINT8 y, UINT8 shade, UINT8 *tile_out)
+{
+    UINT8 tile_x = (UINT8)(x >> 3u);
+    UINT8 tile_y = (UINT8)(y >> 3u);
+    UINT8 pixel_x = (UINT8)(x & 7u);
+    UINT8 pixel_y = (UINT8)(y & 7u);
+    UINT8 tile = (UINT8)(tile_y * PAINT_CANVAS_WIDTH_TILES + tile_x);
+    UINT16 offset = (UINT16)(paint_tile_offset(tile) + (UINT16)pixel_y * 2u);
+    UINT8 mask = (UINT8)(0x80u >> pixel_x);
+    UINT8 old_plane_zero = paint_canvas[offset];
+    UINT8 old_plane_one = paint_canvas[(UINT16)(offset + 1u)];
+    UINT8 plane_zero = (UINT8)(old_plane_zero & (UINT8)~mask);
+    UINT8 plane_one = (UINT8)(old_plane_one & (UINT8)~mask);
 
-        if (pressed_joypad & J_START) {
-            play_sound(SFX_SELECT); // Changed from play_sound_effect
-            HIDE_SPRITES;
-            current_paint_state = PAINT_STATE_EXIT;
-        }
-        if (pressed_joypad & J_SELECT) {
-            current_paint_color_idx = (current_paint_color_idx + 1) % NUM_AVAILABLE_DRAW_COLORS;
-            play_sound(SFX_PAINT_TOOL_SELECT); // Changed from play_sound_effect
-            paint_draw_ui(); // Redraw UI to show new color selection
-        }
+    if (shade & 1u) plane_zero |= mask;
+    if (shade & 2u) plane_one |= mask;
 
-        // Cursor Movement (simple 8px steps)
-        UINT8 moved = 0;
-        if ((joypad_state & J_UP) && !(previous_joypad_state & J_UP)) {
-            if (cursor.y_px > 0) {cursor.y_px -= 8; moved = 1;}
-        }
-        if ((joypad_state & J_DOWN) && !(previous_joypad_state & J_DOWN)) {
-            if (cursor.y_px < (PAINT_CANVAS_HEIGHT * 8) - 8) {cursor.y_px += 8; moved = 1;}
-        }
-        if ((joypad_state & J_LEFT) && !(previous_joypad_state & J_LEFT)) {
-            if (cursor.x_px > 0) {cursor.x_px -= 8; moved = 1;}
-        }
-        if ((joypad_state & J_RIGHT) && !(previous_joypad_state & J_RIGHT)) {
-            if (cursor.x_px < (PAINT_CANVAS_WIDTH * 8) - 8) {cursor.x_px += 8; moved = 1;}
-        }
-        if(moved) play_sound(SFX_CURSOR_MOVE);
+    *tile_out = tile;
+    if (plane_zero == old_plane_zero && plane_one == old_plane_one) return 0u;
 
-        // Drawing
-        if (joypad_state & J_A) { // Hold A to draw
-            paint_at_cursor(); // paint_at_cursor could check if a sound should play
-                               // to avoid rapid sound triggering. For now, play per frame.
-            play_sound(SFX_PAINT_DRAW); // Changed from play_sound_effect
-        }
+    paint_canvas[offset] = plane_zero;
+    paint_canvas[(UINT16)(offset + 1u)] = plane_one;
+    return 1u;
+}
 
-        update_paint_cursor_sprite();
+static void paint_draw_at_pointer(UINT8 shade)
+{
+    const PointerState *pointer = pointer_get();
+    UINT8 relative_x;
+    UINT8 relative_y;
+    UINT8 tile;
 
-        wait_vbl_done();
-    } // End of while(current_paint_state != PAINT_STATE_EXIT)
-  
-    return APP_STATE_HOME; // Return to home screen when exiting paint
+    if (pointer->x < PAINT_CANVAS_X_PIXELS ||
+        pointer->x >= (UINT8)(PAINT_CANVAS_X_PIXELS + PAINT_CANVAS_WIDTH_PIXELS) ||
+        pointer->y < PAINT_CANVAS_Y_PIXELS ||
+        pointer->y >= (UINT8)(PAINT_CANVAS_Y_PIXELS + PAINT_CANVAS_HEIGHT_PIXELS)) {
+        return;
+    }
+
+    relative_x = (UINT8)(pointer->x - PAINT_CANVAS_X_PIXELS);
+    relative_y = (UINT8)(pointer->y - PAINT_CANVAS_Y_PIXELS);
+    if (paint_set_pixel(relative_x, relative_y, shade, &tile)) {
+        paint_upload_tile(tile);
+        audio_sfx(SFX_DRAW);
+    }
+}
+
+static void paint_begin_clear(void)
+{
+    paint_clear_pending = 1u;
+    paint_clear_next_tile = 0u;
+    ui_text_clipped(1u, 15u, "CLEARING CANVAS", PAL_WINDOW, 18u);
+    audio_sfx(SFX_CLICK);
+}
+
+static void paint_clear_step(void)
+{
+    UINT8 count = PAINT_CLEAR_TILES_PER_FRAME;
+    UINT8 i;
+    UINT16 offset;
+
+    if ((UINT16)paint_clear_next_tile + count > PAINT_CANVAS_TILE_COUNT) {
+        count = (UINT8)(PAINT_CANVAS_TILE_COUNT - paint_clear_next_tile);
+    }
+
+    for (i = 0u; i != count; ++i) {
+        offset = paint_tile_offset((UINT8)(paint_clear_next_tile + i));
+        memset(&paint_canvas[offset], 0xffu, PAINT_TILE_BYTES);
+    }
+    paint_upload_tile_range(paint_clear_next_tile, count);
+    paint_clear_next_tile = (UINT8)(paint_clear_next_tile + count);
+
+    if (paint_clear_next_tile == PAINT_CANVAS_TILE_COUNT) {
+        paint_clear_pending = 0u;
+        paint_draw_controls();
+    }
+}
+
+void paint_enter(void)
+{
+    ui_scene_begin();
+
+    if (!paint_initialized) {
+        memset(paint_canvas, 0xffu, sizeof(paint_canvas));
+        paint_primary_shade = 0u;
+        paint_secondary_shade = 3u;
+        paint_clear_pending = 0u;
+        paint_clear_next_tile = 0u;
+        paint_initialized = 1u;
+    }
+
+    paint_draw_chrome();
+    paint_upload_canvas();
+    paint_map_canvas();
+    paint_draw_swatches();
+    if (paint_clear_pending) {
+        ui_text_clipped(1u, 15u, "CLEARING CANVAS", PAL_WINDOW, 18u);
+    }
+
+    pointer_reset((UINT8)(PAINT_CANVAS_X_PIXELS + PAINT_CANVAS_WIDTH_PIXELS / 2u),
+                  (UINT8)(PAINT_CANVAS_Y_PIXELS + PAINT_CANVAS_HEIGHT_PIXELS / 2u));
+    pointer_show();
+    ui_scene_end();
+}
+
+AppState paint_update(const InputState *input)
+{
+    UINT8 draw_buttons;
+
+    if (input->pressed & J_START) {
+        pointer_hide();
+        audio_sfx(SFX_CLICK);
+        return APP_DESKTOP;
+    }
+
+    if (paint_clear_pending) {
+        paint_clear_step();
+        return APP_PAINT;
+    }
+
+    draw_buttons = (UINT8)(input->held & (J_A | J_B));
+    if (draw_buttons == (J_A | J_B)) {
+        if (input->pressed & (J_A | J_B)) paint_begin_clear();
+        return APP_PAINT;
+    }
+
+    if (input->pressed & J_SELECT) {
+        paint_primary_shade = (UINT8)((paint_primary_shade + 1u) & 3u);
+        paint_draw_swatches();
+        audio_sfx(SFX_MOVE);
+    }
+
+    pointer_update(input);
+    if (draw_buttons & J_A) paint_draw_at_pointer(paint_primary_shade);
+    else if (draw_buttons & J_B) paint_draw_at_pointer(paint_secondary_shade);
+
+    return APP_PAINT;
 }

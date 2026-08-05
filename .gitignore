@@ -1,0 +1,17 @@
+build/
+win31.gbc
+win31.map
+win31.noi
+*.o
+*.rel
+*.lst
+*.sym
+*.ihx
+*.asm
+*.adb
+*.cdb
+*.lk
+*.sav
+__pycache__/
+*.pyc
+artifacts-current*.png

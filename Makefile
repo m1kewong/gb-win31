@@ -1,22 +1,56 @@
-# GBDK C Compiler
-# CC = ../gbdk/bin/lcc
-CC = lcc
-# Linker
-# LINK = ../gbdk/bin/lcc
-LINK = lcc
-CFLAGS=-Wl-j -Wm-yC -Wm-yc -Iinclude
+GBDK_HOME ?= /opt/gbdk
+LCC ?= $(GBDK_HOME)/bin/lcc
+TEST_CC ?= cc
+PYBOY_PYTHON ?= python3
 
-all: win31.gbc
+TARGET := build/gb-win31.gbc
+INCLUDES := -Iinclude
+ROM_FLAGS := -Wm-yC -Wm-yn"GB WORKBENCH" -Wl-j
+CFLAGS := $(ROM_FLAGS) $(INCLUDES)
 
-# Add all your .c files here
-SRCS = src/main.c src/ui.c src/minesweeper.c src/paint.c src/sound.c src/tiles.c
-OBJS = $(SRCS:.c=.o) # Not strictly needed for lcc direct to .gbc, but good practice for larger projects
+ROM_SRCS := \
+	src/main.c \
+	src/input.c \
+	src/assets.c \
+	src/ui.c \
+	src/desktop_text.c \
+	src/boot.c \
+	src/desktop.c \
+	src/audio.c \
+	src/minesweeper_model.c \
+	src/minesweeper.c \
+	src/paint.c \
+	src/piano.c \
+	src/media.c \
+	src/cannon.c
 
-all: win31.gbc
+.PHONY: all clean test verify screens visual-test smoke-test
 
-win31.gbc: $(SRCS) include/tiles.h include/ui.h include/minesweeper.h include/paint.h include/sound.h
-	$(CC) $(CFLAGS) -o win31.gbc $(SRCS)
+all: $(TARGET)
+
+$(TARGET): $(ROM_SRCS) $(wildcard include/*.h) | build
+	$(LCC) $(CFLAGS) -o $@ $(ROM_SRCS)
+
+build:
+	mkdir -p $@
+
+build/test-minesweeper: src/minesweeper_model.c tests/test_minesweeper_model.c include/minesweeper_model.h | build
+	$(TEST_CC) -std=c99 -Wall -Wextra -Werror $(INCLUDES) -o $@ src/minesweeper_model.c tests/test_minesweeper_model.c
+
+test: build/test-minesweeper
+	./build/test-minesweeper
+
+verify: $(TARGET)
+	python3 tools/verify_rom.py $(TARGET)
+
+screens: $(TARGET)
+	$(PYBOY_PYTHON) tools/capture_screens.py $(TARGET) --out build/screens
+
+visual-test: screens
+	$(PYBOY_PYTHON) tools/compare_screens.py build/screens tests/golden
+
+smoke-test: $(TARGET)
+	$(PYBOY_PYTHON) tools/smoke_interactions.py $(TARGET)
 
 clean:
-	if exist win31.gbc del /f /q win31.gbc
-	if exist src\*.o del /f /q src\*.o
+	$(RM) -r build
