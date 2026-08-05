@@ -1,6 +1,7 @@
 #include <gb/gb.h>
 #include <gb/cgb.h>
 
+#include "assets.h"
 #include "desktop_text.h"
 
 #define DESKTOP_TEXT_SCREEN_TILES_W 20u
@@ -82,7 +83,8 @@ typedef char desktop_text_tile_count_matches_manifest[
      DESKTOP_TEXT_TILE_COUNT) ? 1 : -1
 ];
 typedef char desktop_text_starts_after_pointer[
-    (DESKTOP_TEXT_TILE_FIRST > 120u) ? 1 : -1
+    (DESKTOP_TEXT_TILE_FIRST >=
+     TILE_POINTER_SPRITE + TILE_POINTER_SPRITE_COUNT) ? 1 : -1
 ];
 typedef char desktop_text_stays_below_limit[
     (DESKTOP_TEXT_TILE_END <= DESKTOP_TEXT_TILE_LIMIT) ? 1 : -1

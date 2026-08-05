@@ -11,8 +11,8 @@ build paths with a clean-room CGB-only implementation.
 The generated cartridge is `build/gb-win31.gbc`: 32 KiB, title
 `GB WORKBENCH`, CGB flag `0xC0`, and valid header/global checksums.
 Its SHA-256 is
-`0e321779aa4ebec3af6b74ec6b9fb3ee956e9e5228592270105497cdd8c0c331`;
-the active 16 KiB ROM bank uses 14,750 bytes (90%), leaving 1,634 bytes.
+`4b446c5a2cba9bc26b1b7b655d28f0e8896cfd8e614417b2f4ff7bf29e8053cb`;
+the active 16 KiB ROM bank uses 14,716 bytes (90%), leaving 1,668 bytes.
 WRAM uses 2,825 of 4,096 bytes, leaving 1,271 bytes.
 
 ## Automated checks
@@ -31,6 +31,8 @@ WRAM uses 2,825 of 4,096 bytes, leaving 1,271 bytes.
   `tests/golden/`.
 - Desktop detection is anchored to the complete 2 x 2 Paint icon rather than
   the old full-tile title text, so the packed desktop font remains testable.
+- Cursor regression coverage verifies 8 x 16 sprite mode, transparent tail
+  padding, and the `(152, 128)` bottom-right position that keeps it on-screen.
 - `tools/verify_rom.py` checks cartridge size alignment, title, CGB-only flag,
   and both checksums.
 
@@ -40,8 +42,8 @@ WRAM uses 2,825 of 4,096 bytes, leaving 1,271 bytes.
   legible at native resolution.
 - The Program Manager matches the selected dual-group design: captions occupy
   independent 32-pixel cells, active and inactive groups are distinct, the
-  pointer no longer hides the icon, and the compact `W` remains readable in
-  `WINDOW` and `SWEEPER`.
+  complete pointer sits below the selected caption, and the compact `W` remains
+  readable in `WINDOW` and `SWEEPER`.
 - Source and implementation were compared together at the same 160 x 144
   viewport and at 4x nearest-neighbor zoom; `design-qa.md` records a pass.
 - Every application can be launched and closed without a blocking input loop.

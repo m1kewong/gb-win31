@@ -25,11 +25,13 @@ OAM_BASE = 0xFE00
 LCD_ENABLE = 0x80
 BG_MAP_SELECT = 0x08
 BG_DATA_8000 = 0x10
+OBJ_SIZE_8X16 = 0x04
 
 TILE_BLANK = 64
 TILE_MS_HIDDEN = 78
 TILE_MS_FLAG = 79
 TILE_ICON_PAINT = 96
+TILE_POINTER_SPRITE = 118
 
 DESKTOP_PAINT_TILES = (
     (3, 4, TILE_ICON_PAINT),
@@ -239,6 +241,20 @@ class RomSmoke:
             f"frame {self.frame}: desktop Paint icon was not ready; tiles={actual}"
         )
 
+    def assert_pointer_sprite(self) -> None:
+        if not self.pyboy.memory[LCDC_REG] & OBJ_SIZE_8X16:
+            raise SmokeFailure(f"frame {self.frame}: pointer is not in 8x16 mode")
+
+        pointer_data = self.vram_bytes(
+            0,
+            0x8000 + TILE_POINTER_SPRITE * 16,
+            32,
+        )
+        if pointer_data[-8:] != bytes(8):
+            raise SmokeFailure(
+                f"frame {self.frame}: pointer tail has no transparent padding"
+            )
+
     def launch_icon(self, index: int, title: tuple[int, int, str]) -> None:
         self.wait_desktop()
         for _ in range(index):
@@ -255,6 +271,7 @@ def run_smoke(smoke: RomSmoke) -> None:
     smoke.wait_text(1, 0, "GB WORKBENCH BIOS", timeout=240)
     smoke.press("start")
     smoke.wait_desktop()
+    smoke.assert_pointer_sprite()
     print("ok boot -> desktop")
 
     # A click away from every icon must not launch the stale keyboard selection.
@@ -361,6 +378,13 @@ def run_smoke(smoke: RomSmoke) -> None:
     smoke.press("start")
     smoke.wait_desktop()
     print("ok Cannon fire/reset/exit")
+
+    smoke.press(("right", "down"), frames=200)
+    if smoke.pointer_position() != (152, 128):
+        raise SmokeFailure(
+            f"frame {smoke.frame}: 8x16 pointer bounds were {smoke.pointer_position()}"
+        )
+    print("ok full cursor bounds")
 
 
 def main() -> None:

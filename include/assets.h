@@ -53,7 +53,8 @@ enum BackgroundTile {
     TILE_STATIC_COUNT = 116
 };
 
-#define TILE_POINTER_SPRITE 120u
+#define TILE_POINTER_SPRITE 118u
+#define TILE_POINTER_SPRITE_COUNT 2u
 
 void assets_load(void);
 UINT8 assets_font_tile(char c);

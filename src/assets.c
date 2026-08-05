@@ -361,15 +361,26 @@ static void build_misc_tiles(void)
 
 static void build_pointer(void)
 {
-    UINT8 y;
-    tile_clear(0u);
-    for (y = 0u; y != 7u; ++y) {
-        tile_pixel(0u, y, 3u);
-        if (y < 6u) tile_pixel((UINT8)(y + 1u), y, 3u);
-        if (y > 1u) tile_pixel(1u, y, 1u);
-    }
-    tile_hline(7u, 0u, 2u, 3u);
-    set_sprite_data(TILE_POINTER_SPRITE, 1u, tile_buffer);
+    static const UINT8 pointer_tiles[32] = {
+        0x80u, 0x80u,
+        0xc0u, 0xc0u,
+        0xe0u, 0xa0u,
+        0xf0u, 0x90u,
+        0xf8u, 0x88u,
+        0xfcu, 0x84u,
+        0xfeu, 0x82u,
+        0xf8u, 0xb8u,
+        0xf8u, 0xe8u,
+        0x38u, 0x28u,
+        0x38u, 0x28u,
+        0x38u, 0x38u,
+        0x00u, 0x00u,
+        0x00u, 0x00u,
+        0x00u, 0x00u,
+        0x00u, 0x00u
+    };
+
+    set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tiles);
 }
 
 void assets_load(void)

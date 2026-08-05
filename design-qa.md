@@ -36,10 +36,10 @@ No actionable P0, P1, or P2 differences remain.
 - Copy and content: app captions match their launch targets. `FILE OPTIONS
   WINDOW HELP` intentionally adds the authentic Program Manager Window menu
   while fitting on one native row.
-- States and affordances: the pointer plus reversed caption communicates
-  selection without the former extra marker. Each icon/caption cell has a
-  32 x 32 hit target; Select cycles all five items, crossing groups updates the
-  active title, and A launches the hovered app.
+- States and affordances: the complete high-contrast 8 x 16 pointer plus
+  reversed caption communicates selection without the former extra marker.
+  Each icon/caption cell has a 32 x 32 hit target; Select cycles all five items,
+  crossing groups updates the active title, and A launches the hovered app.
 - Accessibility and resilience: selection has both pointer and contrast cues,
   active text contrast is high, and all content remains inside the fixed
   20 x 18 hardware tile viewport. Responsive behavior is not applicable to a
@@ -54,7 +54,12 @@ No actionable P0, P1, or P2 differences remain.
 2. The next text pass exposed a P2 optical ambiguity in the packed `W`, most
    visible in `WINDOW` and `SWEEPER`. The five-row glyph was reshaped with a
    pointed lower stroke.
-3. Post-fix evidence is the full-view and focused comparison listed above.
+3. Hardware-scale review later exposed a P2 cursor defect: the compressed 8 x 8
+   arrow ended on its tile boundary, making its tail appear clipped. It was
+   replaced by an 8 x 16 two-tile arrow with one transparent side column and
+   four transparent bottom rows, then positioned below the selected caption.
+   Emulator smoke now asserts sprite mode, tail padding, and bottom-right bounds.
+4. Post-fix evidence is the full-view and focused comparison listed above.
    Native capture, 4x inspection, exact-frame regression, and interaction smoke
    now show no remaining P0/P1/P2 issue.
 

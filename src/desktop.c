@@ -127,8 +127,8 @@ void desktop_enter(void)
     active_group = 0u;
     draw_group_titles();
     draw_icons();
-    /* Keep the pointer in Paint's 32 px cell without hiding the icon art. */
-    pointer_reset(43u, 55u);
+    /* Keep the pointer selected while placing the full arrow below the label. */
+    pointer_reset(45u, 62u);
     pointer_show();
     ui_scene_end();
 }
