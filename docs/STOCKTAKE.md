@@ -40,14 +40,14 @@ Program Manager. There is no Solitaire.
 | 8 | Piano with white and black keys | Yes | Crude grid | Yes |
 | 9 | Media Player display and transport buttons | Yes | Text only | Yes |
 | 10 | Paint colour/tool column | Yes | Partial | Partial (swatches) |
-| 11 | Arrow pointer with tail | Yes | Triangle | Triangle |
+| 11 | Arrow pointer with tail | Yes | Triangle | Yes |
 | 12 | Minimisable/movable windows | Partial | No | No |
 | 13 | Sweeper board sizes | 3 | 1 | 1 |
 | 14 | Game Boy Printer / saves | Printer | No | Battery SRAM available, unused |
 | 15 | Cannon scenery art | Yes | Minimal | Minimal |
 
 Distance: the rebuild met 0 of 15 criteria fully (2 partial). After this PR
-it meets 9 fully and 1 partially. Functionally it already matched the GBS app
+it meets 10 fully and 1 partially. Functionally it already matched the GBS app
 line-up; the gap was almost entirely presentation.
 
 ## Where the rebuild is already ahead
@@ -61,10 +61,9 @@ line-up; the gap was almost entirely presentation.
 ## Remaining backlog (after this PR)
 
 1. Solitaire (Klondike) - the planned improvement over GBS Windows.
-2. Arrow pointer with a tail (two stacked 8x8 sprites).
-3. Sweeper Beginner/Intermediate/Expert sizes via the Game menu.
-4. Paint tool column (pencil, line, fill) and SRAM-backed save.
-5. Real minimise/restore for application windows.
-6. Cannon scenery pass (city skyline, colour).
-7. Game Boy Printer output from Paint.
-8. Real-hardware and second-emulator smoke matrix.
+2. Sweeper Beginner/Intermediate/Expert sizes via the Game menu.
+3. Paint tool column (pencil, line, fill) and SRAM-backed save.
+4. Real minimise/restore for application windows.
+5. Cannon scenery pass (city skyline, colour).
+6. Game Boy Printer output from Paint.
+7. Real-hardware and second-emulator smoke matrix.

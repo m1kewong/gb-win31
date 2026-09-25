@@ -34,7 +34,9 @@ byte-for-byte with GBDK 4.5.0 before any change.
   both checksums.
 - `make smoke-test` (PyBoy 2.7.0), synchronised on the exported `gbw_scene`
   byte rather than on rendered text:
-  - boot quick-start to desktop, 8x8 pointer with transparent padding;
+  - boot quick-start to desktop; two-sprite arrow pointer with a black tip at
+    the hotspot, transparent padding, and the tail sprite locked 8px under the
+    head;
   - empty desktop click changes nothing;
   - Paint writes the expected bank-1 pixel bytes;
   - Sweeper opens over the Program Manager, flags (LED 010 -> 009), reveals,
@@ -59,6 +61,6 @@ byte-for-byte with GBDK 4.5.0 before any change.
 
 ## Remaining release gates
 
-See the backlog in `docs/STOCKTAKE.md`: Solitaire, arrow pointer, Sweeper board
+See the backlog in `docs/STOCKTAKE.md`: Solitaire, Sweeper board
 sizes, Paint tools and saves, minimise/restore, Cannon art, printer, and the
 real-hardware matrix.

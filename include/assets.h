@@ -26,7 +26,8 @@ enum BackgroundPalette {
 #define COLOR_DARK 2u
 #define COLOR_BLACK 3u
 
-/* Bank-0 tiles. The pointer sprite shares tile 120 with the background. */
+/* Bank-0 tiles. The two pointer sprite tiles (120-121) share the background
+ * tile space. */
 enum BackgroundTile {
     TILE_FONT_FIRST = 0,
     TILE_FONT_LAST = 63,
@@ -71,7 +72,7 @@ enum BackgroundTile {
 };
 
 #define TILE_POINTER_SPRITE 120u
-#define TILE_POINTER_SPRITE_COUNT 1u
+#define TILE_POINTER_SPRITE_COUNT 2u
 
 /* VRAM bank 1: per-scene application art, then the per-scene label pool. */
 #define APP_ART_FIRST 0u

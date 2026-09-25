@@ -351,20 +351,30 @@ static void build_icons(void)
     }
 }
 
+/* Windows-style arrow over two stacked 8x8 sprites; the hotspot is the tip at
+ * the top-left pixel. Colour 3 outline, colour 1 fill, colour 0 transparent. */
 static void build_pointer(void)
 {
-    static const UINT8 pointer_tile[16] = {
-        0x80u, 0x80u,
-        0xc0u, 0xc0u,
-        0xe0u, 0xa0u,
-        0xf0u, 0x90u,
-        0xf8u, 0x88u,
-        0xfcu, 0x84u,
-        0xfeu, 0xfeu,
+    static const UINT8 pointer_tiles[32] = {
+        0x80u, 0x80u, /* X....... */
+        0xc0u, 0xc0u, /* XX...... */
+        0xe0u, 0xa0u, /* XoX..... */
+        0xf0u, 0x90u, /* XooX.... */
+        0xf8u, 0x88u, /* XoooX... */
+        0xfcu, 0x84u, /* XooooX.. */
+        0xfeu, 0x82u, /* XoooooX. */
+        0xfeu, 0x8eu, /* XoooXXX. */
+        0xf8u, 0xa8u, /* XoXoX... */
+        0xdcu, 0xd4u, /* XX.XoX.. */
+        0x1cu, 0x14u, /* ...XoX.. */
+        0x0eu, 0x0au, /* ....XoX. */
+        0x06u, 0x06u, /* .....XX. */
+        0x00u, 0x00u,
+        0x00u, 0x00u,
         0x00u, 0x00u
     };
 
-    set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tile);
+    set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tiles);
 }
 
 void assets_restore_palettes(void) BANKED

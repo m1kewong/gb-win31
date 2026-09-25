@@ -214,7 +214,7 @@ void desktop_enter(void) BANKED
     desktop_focused = 1u;
     render_text();
     draw_program_manager();
-    pointer_reset(38u, 58u);
+    pointer_reset(41u, 40u);
     pointer_show();
     ui_scene_end();
 }
@@ -233,7 +233,7 @@ AppState desktop_update(const InputState *input) BANKED
             (UINT8)((selected_icon + 1u) % DESKTOP_ICON_COUNT);
         change_selection(hover);
         icon = &desktop_icons[hover];
-        pointer_move_to((UINT8)(icon->center - 2u), (UINT8)((icon->icon_y << 3u) + 6u));
+        pointer_move_to((UINT8)(icon->center + 9u), (UINT8)((icon->icon_y << 3u) + 8u));
         audio_sfx(SFX_MOVE);
     }
 
