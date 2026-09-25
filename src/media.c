@@ -69,7 +69,6 @@ static UINT8 media_progress;
 static UINT8 media_progress_wait;
 static UiLabel status_label;
 static UiLabel track_label;
-static char media_art[64];
 
 static void build_button_art(void)
 {
@@ -95,11 +94,11 @@ static void build_button_art(void)
                         if (media_glyphs[(UINT16)glyph * 128u + row * 16u + x] == '#') pixel = '3';
                         if (row == 0u || x == 0u) pixel = light;
                         if (row == 7u || x == 15u) pixel = dark;
-                        media_art[(UINT8)(row * 8u + column)] = pixel;
+                        ui_art_scratch[(UINT8)(row * 8u + column)] = pixel;
                     }
                 }
                 ui_art_load(1u, (UINT8)(MEDIA_ART_BUTTONS + glyph * 4u + pressed * 2u + half),
-                            1u, media_art);
+                            1u, ui_art_scratch);
             }
         }
     }

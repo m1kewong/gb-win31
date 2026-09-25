@@ -7,6 +7,7 @@
 static PointerState pointer_state;
 static UINT8 label_pool_used;
 static UINT8 art_buffer[16];
+char ui_art_scratch[64];
 
 void ui_scene_begin(void)
 {

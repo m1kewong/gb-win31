@@ -134,7 +134,6 @@ static UINT16 timer_seconds;
 static UINT8 rendered_tiles[MS_MODEL_CELL_COUNT];
 static UINT8 rendered_palettes[MS_MODEL_CELL_COUNT];
 static unsigned int next_seed = 0x3101u;
-static char face_tile_art[64];
 
 static void load_face_art(void)
 {
@@ -151,12 +150,12 @@ static void load_face_art(void)
                                (UINT16)((quadrant & 1u) * 8u)];
             for (row = 0u; row != 8u; ++row) {
                 for (column = 0u; column != 8u; ++column) {
-                    face_tile_art[(UINT8)(row * 8u + column)] =
+                    ui_art_scratch[(UINT8)(row * 8u + column)] =
                         source[(UINT16)row * 16u + column];
                 }
             }
             ui_art_load(1u, (UINT8)(MS_ART_FACE + face * 4u + quadrant), 1u,
-                        face_tile_art);
+                        ui_art_scratch);
         }
     }
 }
