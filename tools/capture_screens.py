@@ -22,6 +22,9 @@ def main() -> None:
     parser.add_argument("--out", type=pathlib.Path, default=pathlib.Path("build/screens"))
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    # Frames left over from another branch would leak into goldens and montages.
+    for stale in args.out.glob("*.png"):
+        stale.unlink()
 
     machine = emu.Emulator(args.rom)
     try:

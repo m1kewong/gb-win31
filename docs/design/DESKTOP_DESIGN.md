@@ -49,6 +49,9 @@ The layout above is unchanged; the surface treatment moved closer to Windows
   selected caption gets a tight navy box instead of a full-cell fill.
 - Application windows (Sweeper, Piano, Media) are drawn over the Program
   Manager, which switches to inactive titles behind them.
+- The pointer is a Windows-style arrow with a tail (7 x 13, two stacked 8 x 8
+  sprites) whose hotspot is the tip. On the desktop it rests beside the
+  selected icon so it never covers a caption.
 
 ## Visual rules (revision 1)
 
@@ -58,7 +61,7 @@ The layout above is unchanged; the surface treatment moved closer to Windows
 - Inactive group chrome is gray with black text.
 - Use the pointer and reversed caption as selection; remove the extra `+` mark.
 - Render the pointer as a tail-free 45-degree triangle inside one 8 x 8 sprite,
-  with a transparent right column and bottom row.
+  with a transparent right column and bottom row (superseded in revision 2).
 - Icon and caption share one 32 x 32 hit target.
 - Icons are original 16 x 16 VGA-like art using the existing four-color icon
   palette.

@@ -287,27 +287,42 @@ void ui_led_draw(UINT8 x, UINT8 y, UINT8 first_tile, UINT16 value,
     }
 }
 
+#define POINTER_SPRITE_TOP 0u
+#define POINTER_SPRITE_TAIL 1u
+
+static void pointer_place(void)
+{
+    UINT8 screen_x = (UINT8)(pointer_state.x + 8u);
+    UINT8 screen_y = (UINT8)(pointer_state.y + 16u);
+
+    move_sprite(POINTER_SPRITE_TOP, screen_x, screen_y);
+    move_sprite(POINTER_SPRITE_TAIL, screen_x, (UINT8)(screen_y + 8u));
+}
+
 void pointer_reset(UINT8 x, UINT8 y)
 {
     pointer_state.x = x;
     pointer_state.y = y;
     pointer_state.visible = 0u;
-    set_sprite_tile(0u, TILE_POINTER_SPRITE);
-    set_sprite_prop(0u, 0u);
-    move_sprite(0u, (UINT8)(x + 8u), (UINT8)(y + 16u));
+    set_sprite_tile(POINTER_SPRITE_TOP, TILE_POINTER_SPRITE);
+    set_sprite_tile(POINTER_SPRITE_TAIL, (UINT8)(TILE_POINTER_SPRITE + 1u));
+    set_sprite_prop(POINTER_SPRITE_TOP, 0u);
+    set_sprite_prop(POINTER_SPRITE_TAIL, 0u);
+    pointer_place();
 }
 
 void pointer_show(void)
 {
     pointer_state.visible = 1u;
-    move_sprite(0u, (UINT8)(pointer_state.x + 8u), (UINT8)(pointer_state.y + 16u));
+    pointer_place();
     SHOW_SPRITES;
 }
 
 void pointer_hide(void)
 {
     pointer_state.visible = 0u;
-    move_sprite(0u, 0u, 0u);
+    move_sprite(POINTER_SPRITE_TOP, 0u, 0u);
+    move_sprite(POINTER_SPRITE_TAIL, 0u, 0u);
 }
 
 void pointer_update(const InputState *input)
@@ -324,18 +339,14 @@ void pointer_update(const InputState *input)
     if (input->held & J_DOWN) {
         if (pointer_state.y < 136u) ++pointer_state.y;
     }
-    if (pointer_state.visible) {
-        move_sprite(0u, (UINT8)(pointer_state.x + 8u), (UINT8)(pointer_state.y + 16u));
-    }
+    if (pointer_state.visible) pointer_place();
 }
 
 void pointer_move_to(UINT8 x, UINT8 y)
 {
     pointer_state.x = (x > 152u) ? 152u : x;
     pointer_state.y = (y > 136u) ? 136u : y;
-    if (pointer_state.visible) {
-        move_sprite(0u, (UINT8)(pointer_state.x + 8u), (UINT8)(pointer_state.y + 16u));
-    }
+    if (pointer_state.visible) pointer_place();
 }
 
 const PointerState *pointer_get(void)

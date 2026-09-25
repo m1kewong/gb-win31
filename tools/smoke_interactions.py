@@ -96,9 +96,16 @@ def led_tile(digit: int) -> int:
 def assert_pointer_sprite(machine: emu.Emulator) -> None:
     if machine.pyboy.memory[emu.LCDC_REG] & OBJ_SIZE_8X16:
         raise EmuFailure(f"frame {machine.frame}: pointer is not in 8x8 mode")
-    pointer = machine.vram_bytes(0, 0x8000 + emu.TILE_POINTER_SPRITE * 16, 16)
-    if pointer[-2:] != bytes(2) or any(byte & 1 for byte in pointer):
-        raise EmuFailure(f"frame {machine.frame}: triangle has no transparent edge padding")
+    arrow = machine.vram_bytes(0, 0x8000 + emu.TILE_POINTER_SPRITE * 16, 32)
+    if arrow[0] & 0x80 == 0 or arrow[1] & 0x80 == 0:
+        raise EmuFailure(f"frame {machine.frame}: arrow tip is not black at the hotspot")
+    if any(byte & 1 for byte in arrow) or arrow[-6:] != bytes(6):
+        raise EmuFailure(f"frame {machine.frame}: arrow lost its transparent right/bottom padding")
+    oam = machine.pyboy.memory
+    if (oam[emu.OAM_BASE + 4], oam[emu.OAM_BASE + 5]) != (oam[emu.OAM_BASE] + 8, oam[emu.OAM_BASE + 1]):
+        raise EmuFailure(f"frame {machine.frame}: arrow tail sprite is not under the head")
+    if oam[emu.OAM_BASE + 6] != emu.TILE_POINTER_SPRITE + 1:
+        raise EmuFailure(f"frame {machine.frame}: arrow tail sprite uses the wrong tile")
 
 
 def wait_counter(machine: emu.Emulator, value: int) -> None:
