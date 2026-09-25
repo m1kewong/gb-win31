@@ -1,389 +1,404 @@
+#pragma bank 255
+
 #include <gb/gb.h>
 #include <gb/cgb.h>
-#include <stdio.h>
-#include <string.h> // For memset
+
+#include "assets.h"
+#include "audio.h"
+#include "desktop.h"
 #include "minesweeper.h"
-#include "sound.h" // For sound effects
-#include "ui.h"    // For clear_screen_area if needed, or direct manipulation
-#include "tiles.h" // For custom tile data and definitions
-#include "../include/app_states.h" // Include app_states.h
+#include "ui.h"
 
-extern void gotoxy(int x, int y); // Explicit declaration
-extern void set_bkg_attributes_xy(UBYTE x, UBYTE y, UBYTE attributes); // Explicit declaration
-extern UINT8 current_app_state;
-extern UINT8 joypad_state;
+#define MS_NO_CELL 0xffu
 
-// --- Custom Random Number Generator (LCG) ---
-static unsigned int next_rand_seed = 1; // GBDK int is 16-bit
+#define MS_WIN_X 3u
+#define MS_WIN_Y 1u
+#define MS_WIN_W 14u
+#define MS_WIN_H 17u
 
-static void my_srand(unsigned int seed) {
-    next_rand_seed = seed;
-    if (next_rand_seed == 0) next_rand_seed = 1; 
-}
+#define MS_BOARD_PIXEL_X (MS_BOARD_TILE_X * 8u)
+#define MS_BOARD_PIXEL_Y (MS_BOARD_TILE_Y * 8u)
+#define MS_BOARD_PIXEL_W (MS_MODEL_WIDTH * 8u)
+#define MS_BOARD_PIXEL_H (MS_MODEL_HEIGHT * 8u)
 
-static unsigned char my_rand(void) {
-    next_rand_seed = (next_rand_seed * 25173 + 13849); // Values from Numerical Recipes (via Wikipedia)
-    return (unsigned char)(next_rand_seed >> 8); 
-}
-// --- End Custom RNG ---
+#define MS_HEADER_Y 4u
+#define MS_COUNTER_X 5u
+#define MS_TIMER_X 12u
+#define MS_FACE_X 9u
 
-// --- Global Variables for Minesweeper ---
-MinesweeperCell ms_board[MS_BOARD_HEIGHT][MS_BOARD_WIDTH];
-uint8_t ms_cursor_x;
-uint8_t ms_cursor_y;
-uint8_t ms_mines_remaining; // Mines that are not yet flagged
-uint8_t ms_flags_placed;
-uint8_t ms_game_state; // PLAYING, GAME_OVER, WIN
-uint8_t ms_revealed_cells_count;
-uint8_t ms_total_non_mine_cells;
+/* Bank-1 art tiles. */
+#define MS_ART_HIDDEN 0u
+#define MS_ART_FLAG 1u
+#define MS_ART_MINE 2u
+#define MS_ART_EXPLODED 3u
+#define MS_ART_EMPTY 4u
+#define MS_ART_NUM_1 5u
+#define MS_ART_LED 13u
+#define MS_ART_FACE (MS_ART_LED + UI_LED_TILE_COUNT)
+#define MS_ART_COUNT (MS_ART_FACE + 16u)
 
-// Sprite number for the cursor
-#define MS_CURSOR_SPRITE_ID 0
+#define MS_FACE_SMILE 0u
+#define MS_FACE_PRESS 1u
+#define MS_FACE_WIN 2u
+#define MS_FACE_LOSE 3u
 
-// --- Helper Function Prototypes (static) ---
-static void ms_init_board(void);
-static void ms_place_mines(void);
-// static void ms_load_custom_tiles(void); // Tiles are loaded globally by load_all_tiles()
-static void ms_update_cursor_sprite_pos(void);
-static void ms_calculate_adjacent_mines(void);
-static uint8_t ms_count_cell_adjacent_mines(uint8_t r, uint8_t c);
-static void ms_draw_board(void);
-static void ms_draw_status_bar(void);
-static void ms_reveal_cell(uint8_t r, uint8_t c);
-static void ms_toggle_flag(uint8_t r, uint8_t c);
-static void ms_check_win_condition(void);
-static void ms_game_over_sequence(uint8_t won);
-static void ms_clear_game_area(void);
-static void ms_update_mine_count_display(uint8_t count);
+/* Scene palettes: numbers use two palettes to get the classic colours. */
+#define PAL_MS_NUMBERS_A PAL_APP_A
+#define PAL_MS_NUMBERS_B PAL_APP_B
+#define PAL_MS_FACE PAL_MONO
+#define PAL_MS_ALERT PAL_APP_C
 
-// --- Core Game Logic Implementation ---
+static const palette_color_t minesweeper_palettes[] = {
+    /* PAL_APP_A: face, green, navy, grid */
+    RGB(24, 24, 24), RGB(0, 16, 0), RGB(0, 0, 16), RGB(13, 13, 13),
+    /* PAL_APP_B: face, blue, red, grid */
+    RGB(24, 24, 24), RGB(0, 0, 31), RGB(31, 0, 0), RGB(13, 13, 13),
+    /* PAL_MONO: button face, yellow, highlight, black */
+    RGB(24, 24, 24), RGB(31, 31, 0), RGB(31, 31, 31), RGB(0, 0, 0),
+    /* PAL_APP_C: face, highlight, red, black (flags, mines, LEDs) */
+    RGB(24, 24, 24), RGB(31, 31, 31), RGB(31, 0, 0), RGB(0, 0, 0)
+};
 
-static void ms_update_cursor_sprite_pos(void) {
-    uint8_t screen_px, screen_py;
-    screen_px = (MS_BOARD_X_OFFSET + ms_cursor_x) * 8 + 8;
-    screen_py = (MS_BOARD_Y_OFFSET + ms_cursor_y) * 8 + 16;
-    move_sprite(MS_CURSOR_SPRITE_ID, screen_px, screen_py);
-}
+/* Colour index and palette per number, following the Windows 3.1 order. */
+static const UINT8 number_palette[8] = {
+    PAL_MS_NUMBERS_B, PAL_MS_NUMBERS_A, PAL_MS_NUMBERS_B, PAL_MS_NUMBERS_A,
+    PAL_MS_NUMBERS_B, PAL_MS_NUMBERS_A, PAL_MS_NUMBERS_B, PAL_MS_NUMBERS_A
+};
 
-UINT8 start_minesweeper(void) {
-    uint8_t current_joypad = 0, previous_joypad = 0;
+static const char cell_art[] =
+    /* MS_ART_HIDDEN (PAL_WINDOW: raised cell) */
+    "00000001" "01111112" "01111112" "01111112"
+    "01111112" "01111112" "01111112" "12222222"
+    /* MS_ART_FLAG (alert palette) */
+    "11111110" "10022003" "10222003" "10022003"
+    "10000303" "10003303" "10333333" "03333333"
+    /* MS_ART_MINE */
+    "00030000" "03333300" "03113300" "33133330"
+    "03333300" "03333300" "00030000" "00000000"
+    /* MS_ART_EXPLODED */
+    "22232222" "23333322" "23113322" "33133332"
+    "23333322" "23333322" "22232222" "22222222"
+    /* MS_ART_EMPTY (number palettes: grid on top and left) */
+    "33333333" "30000000" "30000000" "30000000"
+    "30000000" "30000000" "30000000" "30000000";
 
-    DISPLAY_ON;
-    SPRITES_8x8;
-    SHOW_SPRITES;
-    SHOW_BKG;
+/* Digits 1-8; ink uses colour 1 or 2 as selected by number_palette. */
+static const char number_art[] =
+    "33333333" "30001000" "30011000" "30001000"
+    "30001000" "30001000" "30011100" "30000000"
+    "33333333" "30011000" "30100100" "30000100"
+    "30001000" "30010000" "30111100" "30000000"
+    "33333333" "30222000" "30000200" "30022000"
+    "30000200" "30000200" "30222000" "30000000"
+    "33333333" "30002000" "30022000" "30202000"
+    "30222200" "30002000" "30002000" "30000000"
+    "33333333" "30222200" "30200000" "30222000"
+    "30000200" "30000200" "30222000" "30000000"
+    "33333333" "30011000" "30100000" "30111000"
+    "30100100" "30100100" "30011000" "30000000"
+    "33333333" "30333300" "30000300" "30003000"
+    "30003000" "30030000" "30030000" "30000000"
+    "33333333" "30033000" "30300300" "30033000"
+    "30300300" "30300300" "30033000" "30000000";
 
-    set_sprite_tile(MS_CURSOR_SPRITE_ID, SPRITE_IDX_MS_CURSOR);
+/* 16x16 faces: 0 button face, 1 yellow, 2 highlight, 3 black. */
+static const char face_art[] =
+    /* smile */
+    "2222222222222223" "2000000000000003" "2000033333300003" "2000311111130003"
+    "2003111111113003" "2031113113111303" "2031113113111303" "2031111111111303"
+    "2031111111111303" "2031131111311303" "2031113333111303" "2003111111113003"
+    "2000311111130003" "2000033333300003" "2000000000000003" "3333333333333333"
+    /* pressed: surprised mouth */
+    "2222222222222223" "2000000000000003" "2000033333300003" "2000311111130003"
+    "2003111111113003" "2031113113111303" "2031113113111303" "2031111111111303"
+    "2031111331111303" "2031113113111303" "2031111331111303" "2003111111113003"
+    "2000311111130003" "2000033333300003" "2000000000000003" "3333333333333333"
+    /* win: sunglasses */
+    "2222222222222223" "2000000000000003" "2000033333300003" "2000311111130003"
+    "2003111111113003" "2033333333333303" "2031333113331303" "2031131111311303"
+    "2031111111111303" "2031131111311303" "2031113333111303" "2003111111113003"
+    "2000311111130003" "2000033333300003" "2000000000000003" "3333333333333333"
+    /* lose: crossed eyes and frown */
+    "2222222222222223" "2000000000000003" "2000033333300003" "2000311111130003"
+    "2003131311313003" "2031113113111303" "2031131311313303" "2031111111111303"
+    "2031111111111303" "2031113333111303" "2031131111311303" "2003111111113003"
+    "2000311111130003" "2000033333300003" "2000000000000003" "3333333333333333";
 
-    my_srand(DIV_REG); // Seed with DIV_REG, which changes frequently
-    ms_init_board();
-    ms_game_state = MS_GAME_STATE_PLAYING;
-    ms_update_cursor_sprite_pos();
+static MinesweeperModel minesweeper;
+static UINT8 focus_x;
+static UINT8 focus_y;
+static UINT8 exploded_cell;
+static UINT8 face_shown;
+static UINT8 timer_frames;
+static UINT16 timer_seconds;
+static UINT8 rendered_tiles[MS_MODEL_CELL_COUNT];
+static UINT8 rendered_palettes[MS_MODEL_CELL_COUNT];
+static unsigned int next_seed = 0x3101u;
+static char face_tile_art[64];
 
-    while(1) {
-        previous_joypad = current_joypad;
-        current_joypad = joypad();
-        uint8_t pressed_joypad = (current_joypad & ~previous_joypad);
+static void load_face_art(void)
+{
+    UINT8 face;
+    UINT8 quadrant;
+    UINT8 row;
+    UINT8 column;
+    const char *source;
 
-        if (ms_game_state == MS_GAME_STATE_PLAYING) {
-            uint8_t old_cursor_x = ms_cursor_x;
-            uint8_t old_cursor_y = ms_cursor_y;
-            uint8_t board_updated = 0;
-            uint8_t cursor_moved = 0;
-
-            if (pressed_joypad & J_LEFT) {
-                if (ms_cursor_x > 0) ms_cursor_x--;
-                cursor_moved = 1;
-            }
-            if (pressed_joypad & J_RIGHT) {
-                if (ms_cursor_x < MS_BOARD_WIDTH - 1) ms_cursor_x++;
-                cursor_moved = 1;
-            }
-            if (pressed_joypad & J_UP) {
-                if (ms_cursor_y > 0) ms_cursor_y--;
-                cursor_moved = 1;
-            }
-            if (pressed_joypad & J_DOWN) {
-                if (ms_cursor_y < MS_BOARD_HEIGHT - 1) ms_cursor_y++;
-                cursor_moved = 1;
-            }
-
-            if (cursor_moved) {
-                ms_update_cursor_sprite_pos();
-                play_sound(SFX_CURSOR_MOVE);
-            }
-
-            if (pressed_joypad & J_A) {
-                if (!ms_board[ms_cursor_y][ms_cursor_x].is_flagged && !ms_board[ms_cursor_y][ms_cursor_x].is_revealed) {
-                    ms_reveal_cell(ms_cursor_y, ms_cursor_x);
-                    play_sound(SFX_REVEAL_EMPTY); // Corrected: Was SFX_REVEAL_TILE, use SFX_REVEAL_EMPTY
-                }
-                board_updated = 1; 
-            }
-            if (pressed_joypad & J_B) {
-                ms_toggle_flag(ms_cursor_y, ms_cursor_x);
-                play_sound(SFX_PLACE_FLAG); // Corrected: Was SFX_FLAG_MINE, use SFX_PLACE_FLAG
-                board_updated = 1;
-            }
-
-            if (board_updated) {
-                ms_draw_board(); 
-            }
-
-        } else { 
-            if (pressed_joypad & (J_A | J_START)) {
-                ms_init_board();
-                ms_game_state = MS_GAME_STATE_PLAYING;
-                ms_update_cursor_sprite_pos();
-            }
-        }
-
-        if (pressed_joypad & J_SELECT) { 
-            ms_clear_game_area();
-            HIDE_SPRITES;
-            return APP_STATE_HOME;
-        }
-        wait_vbl_done();
-    }
-}
-
-static void ms_clear_game_area(void) {
-    unsigned char blank_tile_idx = MINESWEEPER_TILE_VRAM_OFFSET + TILE_IDX_MS_EMPTY_REVEALED;
-    unsigned char blank_tile_data[1];
-    blank_tile_data[0] = blank_tile_idx;
-
-    for (uint8_t y_tile = MS_STATUS_Y; y_tile < MS_SCREEN_Y_MAX; ++y_tile) {
-        for (uint8_t x_tile = MS_SCREEN_X_MIN; x_tile < MS_SCREEN_X_MAX; ++x_tile) {
-            set_bkg_tiles(x_tile, y_tile, 1, 1, blank_tile_data);
-        }
-    }
-}
-
-static void ms_init_board(void) {
-    ms_cursor_x = 0;
-    ms_cursor_y = 0;
-    ms_mines_remaining = MS_NUM_MINES;
-    ms_flags_placed = 0;
-    ms_revealed_cells_count = 0;
-    ms_total_non_mine_cells = (MS_BOARD_WIDTH * MS_BOARD_HEIGHT) - MS_NUM_MINES;
-    ms_game_state = MS_GAME_STATE_PLAYING;
-
-    for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-        for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-            ms_board[r][c].is_mine = 0;
-            ms_board[r][c].is_revealed = 0;
-            ms_board[r][c].is_flagged = 0;
-            ms_board[r][c].adjacent_mines = 0;
-        }
-    }
-    ms_place_mines();
-    ms_calculate_adjacent_mines();
-    ms_clear_game_area(); 
-    ms_draw_board();
-    ms_draw_status_bar();
-}
-
-static void ms_place_mines(void) {
-    uint8_t mines_placed = 0;
-    uint8_t r, c;
-    while (mines_placed < MS_NUM_MINES) {
-        r = my_rand() % MS_BOARD_HEIGHT;
-        c = my_rand() % MS_BOARD_WIDTH;
-        if (!ms_board[r][c].is_mine) {
-            ms_board[r][c].is_mine = 1;
-            mines_placed++;
-        }
-    }
-}
-
-static uint8_t ms_count_cell_adjacent_mines(uint8_t r, uint8_t c) {
-    uint8_t count = 0;
-    for (int8_t dr = -1; dr <= 1; ++dr) {
-        for (int8_t dc = -1; dc <= 1; ++dc) {
-            if (dr == 0 && dc == 0) continue;
-            uint8_t nr = r + dr;
-            uint8_t nc = c + dc;
-            if (nr < MS_BOARD_HEIGHT && nc < MS_BOARD_WIDTH) { 
-                if (ms_board[nr][nc].is_mine) {
-                    count++;
+    for (face = 0u; face != 4u; ++face) {
+        for (quadrant = 0u; quadrant != 4u; ++quadrant) {
+            source = &face_art[(UINT16)face * 256u +
+                               (UINT16)((quadrant >> 1u) * 8u) * 16u +
+                               (UINT16)((quadrant & 1u) * 8u)];
+            for (row = 0u; row != 8u; ++row) {
+                for (column = 0u; column != 8u; ++column) {
+                    face_tile_art[(UINT8)(row * 8u + column)] =
+                        source[(UINT16)row * 16u + column];
                 }
             }
-        }
-    }
-    return count;
-}
-
-static void ms_calculate_adjacent_mines(void) {
-    for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-        for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-            if (!ms_board[c][c].is_mine) {
-                ms_board[r][c].adjacent_mines = ms_count_cell_adjacent_mines(r, c);
-            }
+            ui_art_load(1u, (UINT8)(MS_ART_FACE + face * 4u + quadrant), 1u,
+                        face_tile_art);
         }
     }
 }
 
-static void ms_draw_status_bar(void) {
-    char status_buf[20]; 
-    
-    fill_bkg_rect_attributes(MS_STATUS_X, MS_STATUS_Y, 19, 1, PAL_IDX_BG_MINESWEEPER);
-
-    unsigned char space_char[1]; space_char[0] = ' '; 
-    for(uint8_t i = 0; i < 19; ++i) { 
-         set_bkg_tiles(MS_STATUS_X + i, MS_STATUS_Y, 1, 1, space_char);
-    }
-
-    if (ms_game_state == MS_GAME_STATE_PLAYING) {
-        sprintf(status_buf, "Mines:%02u Flags:%02u", (unsigned int)ms_mines_remaining, (unsigned int)ms_flags_placed);
-    } else if (ms_game_state == MS_GAME_STATE_GAME_OVER) {
-        sprintf(status_buf, "GAME OVER! (A/St)");
-    } else if (ms_game_state == MS_GAME_STATE_WIN) {
-        sprintf(status_buf, "YOU WIN! (A/Strt)");
-    }
-    gotoxy(MS_STATUS_X, MS_STATUS_Y);
-    printf("%s", status_buf);
+static UINT8 cell_index(UINT8 x, UINT8 y)
+{
+    return (UINT8)(y * MS_MODEL_WIDTH + x);
 }
 
-static void ms_draw_board(void) {
-    fill_bkg_rect_attributes(MS_BOARD_X_OFFSET, MS_BOARD_Y_OFFSET, MS_BOARD_WIDTH, MS_BOARD_HEIGHT, PAL_IDX_BG_MINESWEEPER);
-    
-    unsigned char tile_to_draw_data[1];
+static UINT8 focused_cell(void)
+{
+    return cell_index(focus_x, focus_y);
+}
 
-    for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-        for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-            uint8_t screen_x = c + MS_BOARD_X_OFFSET;
-            uint8_t screen_y = r + MS_BOARD_Y_OFFSET;
-            uint8_t tile_idx;
+static void cell_look(UINT8 index, UINT8 *tile, UINT8 *palette)
+{
+    const MinesweeperModelCell *cell = minesweeper_model_get_cell(
+        &minesweeper,
+        (UINT8)(index % MS_MODEL_WIDTH),
+        (UINT8)(index / MS_MODEL_WIDTH)
+    );
 
-            if (ms_board[r][c].is_revealed) {
-                if (ms_board[r][c].is_mine) {
-                    tile_idx = TILE_IDX_MS_CLICKED_MINE;
-                } else if (ms_board[r][c].adjacent_mines > 0) {
-                    tile_idx = TILE_IDX_MS_NUM_1 + (ms_board[r][c].adjacent_mines - 1);
-                } else {
-                    tile_idx = TILE_IDX_MS_EMPTY_REVEALED;
-                }
-            } else if (ms_board[r][c].is_flagged) {
-                tile_idx = TILE_IDX_MS_FLAG;
-            } else {
-                if (ms_game_state == MS_GAME_STATE_GAME_OVER && ms_board[r][c].is_mine) {
-                    tile_idx = TILE_IDX_MS_MINE;
-                } else {
-                    tile_idx = TILE_IDX_MS_HIDDEN;
-                }
-            }
-            
-            tile_to_draw_data[0] = MINESWEEPER_TILE_VRAM_OFFSET + tile_idx;
-            set_bkg_tiles(screen_x, screen_y, 1, 1, tile_to_draw_data);
-            set_bkg_attributes_xy(screen_x, screen_y, PAL_IDX_BG_MINESWEEPER);
+    *palette = PAL_WINDOW;
+    *tile = MS_ART_HIDDEN;
+    if (cell == (const MinesweeperModelCell *)0) return;
+
+    if (cell->is_revealed) {
+        if (cell->is_mine) {
+            *tile = (index == exploded_cell) ? MS_ART_EXPLODED : MS_ART_MINE;
+            *palette = PAL_MS_ALERT;
+        } else if (cell->adjacent_mines != 0u) {
+            *tile = (UINT8)(MS_ART_NUM_1 + cell->adjacent_mines - 1u);
+            *palette = number_palette[cell->adjacent_mines - 1u];
+        } else {
+            *tile = MS_ART_EMPTY;
+            *palette = PAL_MS_NUMBERS_B;
         }
+    } else if (cell->is_flagged ||
+               (minesweeper_model_is_won(&minesweeper) && cell->is_mine)) {
+        *tile = MS_ART_FLAG;
+        *palette = PAL_MS_ALERT;
     }
 }
 
-static void ms_reveal_cell(uint8_t r, uint8_t c) {
-    if (r >= MS_BOARD_HEIGHT || c >= MS_BOARD_WIDTH) return;
-    if (ms_board[r][c].is_revealed || ms_board[r][c].is_flagged) return;
+static void draw_cell(UINT8 index)
+{
+    UINT8 tile;
+    UINT8 palette;
 
-    ms_board[r][c].is_revealed = 1;
+    cell_look(index, &tile, &palette);
+    if (rendered_tiles[index] == tile && rendered_palettes[index] == palette) return;
+    ui_set_art((UINT8)(MS_BOARD_TILE_X + index % MS_MODEL_WIDTH),
+               (UINT8)(MS_BOARD_TILE_Y + index / MS_MODEL_WIDTH),
+               tile, palette);
+    rendered_tiles[index] = tile;
+    rendered_palettes[index] = palette;
+}
 
-    if (ms_board[r][c].is_mine) {
-        ms_game_state = MS_GAME_STATE_GAME_OVER;
-        ms_game_over_sequence(0); 
-        play_sound(SFX_REVEAL_MINE); // Corrected: Was SFX_GAME_OVER, use SFX_REVEAL_MINE
+static void draw_changed_cells(void)
+{
+    UINT8 index;
+    for (index = 0u; index < MS_MODEL_CELL_COUNT; ++index) draw_cell(index);
+}
+
+static void invalidate_board(void)
+{
+    UINT8 index;
+    for (index = 0u; index < MS_MODEL_CELL_COUNT; ++index) {
+        rendered_tiles[index] = 0xffu;
+        rendered_palettes[index] = 0xffu;
+    }
+}
+
+static void draw_face(UINT8 face)
+{
+    UINT8 first = (UINT8)(MS_ART_FACE + face * 4u);
+
+    face_shown = face;
+    ui_set_art(MS_FACE_X, MS_HEADER_Y, first, PAL_MS_FACE);
+    ui_set_art((UINT8)(MS_FACE_X + 1u), MS_HEADER_Y, (UINT8)(first + 1u), PAL_MS_FACE);
+    ui_set_art(MS_FACE_X, (UINT8)(MS_HEADER_Y + 1u), (UINT8)(first + 2u), PAL_MS_FACE);
+    ui_set_art((UINT8)(MS_FACE_X + 1u), (UINT8)(MS_HEADER_Y + 1u),
+               (UINT8)(first + 3u), PAL_MS_FACE);
+}
+
+static UINT8 resting_face(void)
+{
+    if (minesweeper_model_is_won(&minesweeper)) return MS_FACE_WIN;
+    if (minesweeper_model_is_lost(&minesweeper)) return MS_FACE_LOSE;
+    return MS_FACE_SMILE;
+}
+
+static void draw_counters(void)
+{
+    UINT8 flags = minesweeper_model_is_won(&minesweeper) ?
+        MS_MODEL_MINE_COUNT : minesweeper_model_get_flag_count(&minesweeper);
+
+    ui_led_draw(MS_COUNTER_X, MS_HEADER_Y, MS_ART_LED,
+                (UINT16)(MS_MODEL_MINE_COUNT - flags), 3u, PAL_MS_ALERT);
+    ui_led_draw(MS_TIMER_X, MS_HEADER_Y, MS_ART_LED, timer_seconds, 3u, PAL_MS_ALERT);
+}
+
+static void move_pointer_to_focus(void)
+{
+    pointer_move_to((UINT8)((MS_BOARD_TILE_X + focus_x) * 8u + 3u),
+                    (UINT8)((MS_BOARD_TILE_Y + focus_y) * 8u + 3u));
+}
+
+static UINT8 hovered_cell(void)
+{
+    const PointerState *pointer;
+
+    if (!pointer_hits(MS_BOARD_PIXEL_X, MS_BOARD_PIXEL_Y,
+                      MS_BOARD_PIXEL_W, MS_BOARD_PIXEL_H)) return MS_NO_CELL;
+    pointer = pointer_get();
+    return cell_index((UINT8)((pointer->x - MS_BOARD_PIXEL_X) >> 3u),
+                      (UINT8)((pointer->y - MS_BOARD_PIXEL_Y) >> 3u));
+}
+
+static void start_new_board(void)
+{
+    minesweeper_model_init(&minesweeper, next_seed);
+    next_seed = (unsigned int)((next_seed + 0x9e37u) & 65535u);
+    exploded_cell = MS_NO_CELL;
+    timer_frames = 0u;
+    timer_seconds = 0u;
+    focus_x = (UINT8)(MS_MODEL_WIDTH / 2u);
+    focus_y = (UINT8)(MS_MODEL_HEIGHT / 2u);
+    move_pointer_to_focus();
+    draw_changed_cells();
+    draw_counters();
+    draw_face(MS_FACE_SMILE);
+}
+
+static void after_action(UINT8 action)
+{
+    if (action == MS_MODEL_ACTION_NONE) {
+        audio_sfx(SFX_ERROR);
         return;
     }
-
-    ms_revealed_cells_count++;
-
-    if (ms_board[r][c].adjacent_mines == 0) {
-        for (int8_t dr = -1; dr <= 1; ++dr) {
-            for (int8_t dc = -1; dc <= 1; ++dc) {
-                if (dr == 0 && dc == 0) continue;
-                uint8_t nr = r + dr;
-                uint8_t nc = c + dc;
-                if (nr < MS_BOARD_HEIGHT && nc < MS_BOARD_WIDTH) {
-                     ms_reveal_cell(nr, nc); 
-                }
-            }
-        }
-    } else {
-        set_bkg_tile_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, TILE_IDX_MS_NUM_1 + (ms_board[r][c].adjacent_mines - 1));
-        set_bkg_attributes_xy(MS_BOARD_X_OFFSET + c, MS_BOARD_Y_OFFSET + r, PAL_IDX_BG_MINESWEEPER);
-    }
-    ms_check_win_condition();
+    if (action == MS_MODEL_ACTION_LOST) audio_sfx(SFX_ERROR);
+    else if (action == MS_MODEL_ACTION_WON) audio_sfx(SFX_WIN);
+    else audio_sfx(SFX_CLICK);
+    draw_changed_cells();
+    draw_counters();
+    draw_face(resting_face());
 }
 
-static void ms_toggle_flag(uint8_t r, uint8_t c) {
-    if (ms_board[r][c].is_revealed) return; 
-
-    if (ms_board[r][c].is_flagged) {
-        ms_board[r][c].is_flagged = 0;
-        ms_flags_placed--;
-        if(ms_board[r][c].is_mine) ms_mines_remaining++; 
-        play_sound(SFX_PLACE_FLAG); // Corrected: Was SFX_FLAG_MINE, use SFX_PLACE_FLAG
-    } else {
-        ms_board[r][c].is_flagged = 1;
-        ms_flags_placed++;
-        if(ms_board[r][c].is_mine) ms_mines_remaining--; 
-        play_sound(SFX_PLACE_FLAG); // Corrected: Was SFX_FLAG_MINE, use SFX_PLACE_FLAG
-    }
-    ms_check_win_condition();
+static void tick_timer(void)
+{
+    if (!minesweeper_model_are_mines_placed(&minesweeper) ||
+        minesweeper_model_get_status(&minesweeper) != MS_MODEL_PLAYING ||
+        timer_seconds >= 999u) return;
+    if (++timer_frames < 60u) return;
+    timer_frames = 0u;
+    ++timer_seconds;
+    ui_led_draw(MS_TIMER_X, MS_HEADER_Y, MS_ART_LED, timer_seconds, 3u, PAL_MS_ALERT);
 }
 
-static void ms_check_win_condition(void) {
-    if (ms_game_state != MS_GAME_STATE_PLAYING) return;
+void minesweeper_enter(void) BANKED
+{
+    ui_scene_begin();
+    set_bkg_palette(PAL_APP_A, 1u, &minesweeper_palettes[0]);
+    set_bkg_palette(PAL_APP_B, 1u, &minesweeper_palettes[4]);
+    set_bkg_palette(PAL_MONO, 1u, &minesweeper_palettes[8]);
+    set_bkg_palette(PAL_APP_C, 1u, &minesweeper_palettes[12]);
+    ui_art_load(1u, MS_ART_HIDDEN, 5u, cell_art);
+    ui_art_load(1u, MS_ART_NUM_1, 8u, number_art);
+    ui_led_load(MS_ART_LED);
+    load_face_art();
 
-    if (ms_revealed_cells_count == ms_total_non_mine_cells) {
-        ms_game_state = MS_GAME_STATE_WIN;
-        ms_game_over_sequence(1); 
-        play_sound(SFX_WIN_GAME); // Corrected: Was SFX_GAME_WIN, use SFX_WIN_GAME
-        return;
-    }
-    
-    if (ms_mines_remaining == 0 && ms_flags_placed == MS_NUM_MINES) {
-        uint8_t correctly_flagged_mines = 0;
-        for(uint8_t r_idx = 0; r_idx < MS_BOARD_HEIGHT; ++r_idx){
-            for(uint8_t c_idx = 0; c_idx < MS_BOARD_WIDTH; ++c_idx){
-                if(ms_board[r_idx][c_idx].is_mine && ms_board[r_idx][c_idx].is_flagged){
-                    correctly_flagged_mines++;
-                }
-            }
-        }
-        if(correctly_flagged_mines == MS_NUM_MINES){
-            ms_game_state = MS_GAME_STATE_WIN;
-            ms_game_over_sequence(1);
-            play_sound(SFX_WIN_GAME); // Corrected: Was SFX_GAME_WIN, use SFX_WIN_GAME
-            return;
-        }
-    }
+    desktop_draw_backdrop();
+    ui_window(MS_WIN_X, MS_WIN_Y, MS_WIN_W, MS_WIN_H, "Sweeper", 1u, UI_CLIENT_FACE);
+    ui_menu((UINT8)(MS_WIN_X + 1u), (UINT8)(MS_WIN_Y + 1u),
+            (UINT8)(MS_WIN_W - 2u), "Game  Help");
+    ui_sunken(MS_COUNTER_X, MS_HEADER_Y, MS_MODEL_WIDTH, 2u);
+    ui_sunken(MS_BOARD_TILE_X, MS_BOARD_TILE_Y, MS_MODEL_WIDTH, MS_MODEL_HEIGHT);
+
+    invalidate_board();
+    pointer_reset(80u, 72u);
+    start_new_board();
+    pointer_show();
+    ui_scene_end();
 }
 
-static void ms_game_over_sequence(uint8_t won) {
-    play_sound(won ? SFX_WIN_GAME : SFX_REVEAL_MINE); // Corrected: Was SFX_GAME_WIN and SFX_GAME_OVER, use SFX_WIN_GAME and SFX_REVEAL_MINE
-    if (!won) {
-        for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-            for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-                if (ms_board[r][c].is_mine && !ms_board[r][c].is_revealed) {
-                    ms_board[r][c].is_revealed = 1; // Reveal unrevealed mines on loss
-                }
-            }
-        }
-    } else { 
-        for (uint8_t r = 0; r < MS_BOARD_HEIGHT; ++r) {
-            for (uint8_t c = 0; c < MS_BOARD_WIDTH; ++c) {
-                if (ms_board[r][c].is_mine && !ms_board[r][c].is_flagged) {
-                    ms_board[r][c].is_flagged = 1; 
-                }
-            }
-        }
-        ms_flags_placed = MS_NUM_MINES;
-        ms_mines_remaining = 0;
-    }
-    ms_draw_board(); 
-}
+AppState minesweeper_update(const InputState *input) BANKED
+{
+    UINT8 hover;
+    UINT8 next_focus;
+    UINT8 face;
 
-static void ms_update_mine_count_display(uint8_t count) {
-    gotoxy(MS_MINE_COUNT_X_TILES, MS_MINE_COUNT_Y_TILES);
-    fill_bkg_rect_attributes(MS_MINE_COUNT_X_TILES, MS_MINE_COUNT_Y_TILES, 7, 1, PAL_IDX_BG_MINESWEEPER); // Cover text area
-    printf("Mines:%d ", count); // Added colon, ensure spacing fits
+    if ((input->pressed & J_START) ||
+        ((input->pressed & J_A) &&
+         pointer_in_tiles(MS_WIN_X, MS_WIN_Y, 2u, 1u))) {
+        audio_sfx(SFX_CLICK);
+        pointer_hide();
+        return APP_DESKTOP;
+    }
+
+    pointer_update(input);
+    tick_timer();
+    hover = hovered_cell();
+    if (hover != MS_NO_CELL && hover != focused_cell()) {
+        focus_x = (UINT8)(hover % MS_MODEL_WIDTH);
+        focus_y = (UINT8)(hover / MS_MODEL_WIDTH);
+    }
+
+    if (input->pressed & J_SELECT) {
+        next_focus = (UINT8)(focused_cell() + 1u);
+        if (next_focus >= MS_MODEL_CELL_COUNT) next_focus = 0u;
+        focus_x = (UINT8)(next_focus % MS_MODEL_WIDTH);
+        focus_y = (UINT8)(next_focus / MS_MODEL_WIDTH);
+        move_pointer_to_focus();
+        hover = next_focus;
+        audio_sfx(SFX_MOVE);
+    }
+
+    if (input->pressed & J_A) {
+        if (pointer_in_tiles(MS_FACE_X, MS_HEADER_Y, 2u, 2u) ||
+            pointer_hits((UINT8)((MS_WIN_X + 1u) << 3u), (UINT8)((MS_WIN_Y + 1u) << 3u),
+                         24u, 8u)) {
+            start_new_board();
+            audio_sfx(SFX_CLICK);
+            return APP_SWEEPER;
+        }
+        if (hover != MS_NO_CELL) {
+            face = minesweeper_model_reveal(&minesweeper, focus_x, focus_y);
+            if (face == MS_MODEL_ACTION_LOST) exploded_cell = focused_cell();
+            after_action(face);
+        } else {
+            audio_sfx(SFX_ERROR);
+        }
+    }
+
+    if ((input->pressed & J_B) && hover != MS_NO_CELL) {
+        after_action(minesweeper_model_toggle_flag(&minesweeper, focus_x, focus_y));
+    }
+
+    face = resting_face();
+    if (face == MS_FACE_SMILE && (input->held & J_A) && hover != MS_NO_CELL) {
+        face = MS_FACE_PRESS;
+    }
+    if (face != face_shown) draw_face(face);
+    return APP_SWEEPER;
 }
