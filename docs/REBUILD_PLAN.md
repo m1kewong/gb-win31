@@ -65,7 +65,7 @@ Captured evidence is kept under `docs/baseline/`.
 | 1 | Complete, 3.1 chrome pass | Mixed-case proportional font, white clients, menu rules, Win 3.1 title buttons, apps drawn over an inactive Program Manager, golden frames | Arrow pointer with tail; functional minimise/maximise |
 | 2 | Playable, restyled | Sweeper with LED counters, smiley and raised cells; true-pixel Paint with sunken canvas and swatches | Board sizes, Paint tools and SRAM save |
 | 3 | Playable, restyled | Piano keyboard art, Media LCD and transport buttons, Cannon LED score | Tempo/rhythm controls, Cannon scenery |
-| 3.5 | Next | Solitaire (Klondike), the improvement over GBS Windows | Model, host tests, card art, pointer play, win cascade |
+| 3.5 | Playable first pass | Klondike model with host and soak tests; card art, snap controls, autocomplete, win/redeal; desktop icon | Win cascade, Draw Three option, undo |
 | 4 | Not started | Roadmap below | Printer, SRAM persistence, SameBoy/mGBA and physical-hardware matrix |
 
 The GBS Windows comparison that set these priorities is in

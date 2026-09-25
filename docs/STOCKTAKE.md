@@ -58,9 +58,16 @@ line-up; the gap was almost entirely presentation.
 - MBC5 with automatic banking: ROM bank 0 dropped from 90% to 46% full, and
   the cartridge now has room for Solitaire, saves and more apps.
 
-## Remaining backlog (after this PR)
+## Beyond GBS Windows
 
-1. Solitaire (Klondike) - the planned improvement over GBS Windows.
+Solitaire (Klondike) is implemented: Windows-order layout, draw one with
+standard scoring, inverted selection, snap controls, automatic finish, and a
+host-tested rules model. GBS Windows has no card game.
+
+## Remaining backlog
+
+1. Solitaire polish: the bouncing-card win cascade, a Draw Three option, and
+   undo.
 2. Arrow pointer with a tail (two stacked 8x8 sprites).
 3. Sweeper Beginner/Intermediate/Expert sizes via the Game menu.
 4. Paint tool column (pencil, line, fill) and SRAM-backed save.
