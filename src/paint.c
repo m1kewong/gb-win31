@@ -1,3 +1,5 @@
+#pragma bank 255
+
 #include <gb/gb.h>
 #include <gb/cgb.h>
 #include <string.h>
@@ -8,7 +10,7 @@
 #include "ui.h"
 
 #define PAINT_CANVAS_X_TILES 3u
-#define PAINT_CANVAS_Y_TILES 4u
+#define PAINT_CANVAS_Y_TILES 3u
 #define PAINT_CANVAS_X_PIXELS (PAINT_CANVAS_X_TILES * 8u)
 #define PAINT_CANVAS_Y_PIXELS (PAINT_CANVAS_Y_TILES * 8u)
 #define PAINT_CANVAS_WIDTH_PIXELS (PAINT_CANVAS_WIDTH_TILES * 8u)
@@ -25,9 +27,9 @@
 #define PAINT_SHADE_COUNT 4u
 #define PAINT_CLEAR_TILES_PER_FRAME 4u
 
-#define PAINT_PRIMARY_SWATCH_X 3u
-#define PAINT_SECONDARY_SWATCH_X 7u
-#define PAINT_SWATCH_Y 2u
+#define PAINT_PRIMARY_SWATCH_X 4u
+#define PAINT_SECONDARY_SWATCH_X 8u
+#define PAINT_SWATCH_Y 15u
 
 typedef char paint_tiles_must_fit_vram_bank[
     ((PAINT_SWATCH_VRAM_BASE + PAINT_SHADE_COUNT) <= 256u) ? 1 : -1
@@ -41,6 +43,7 @@ static UINT8 paint_primary_shade;
 static UINT8 paint_secondary_shade;
 static UINT8 paint_clear_pending;
 static UINT8 paint_clear_next_tile;
+static UiLabel paint_status_label;
 
 /* Four solid 2bpp tiles, one for each shade in PAL_MONO. */
 static const UINT8 paint_swatch_tiles[PAINT_SHADE_COUNT * PAINT_TILE_BYTES] = {
@@ -107,26 +110,6 @@ static void paint_map_canvas(void)
     }
 }
 
-static void paint_draw_canvas_frame(void)
-{
-    UINT8 x;
-    UINT8 y;
-
-    ui_set_tile(2u, 3u, TILE_FRAME_TL, PAL_WINDOW);
-    ui_set_tile(17u, 3u, TILE_FRAME_TR, PAL_WINDOW);
-    ui_set_tile(2u, 14u, TILE_FRAME_BL, PAL_WINDOW);
-    ui_set_tile(17u, 14u, TILE_FRAME_BR, PAL_WINDOW);
-
-    for (x = 3u; x != 17u; ++x) {
-        ui_set_tile(x, 3u, TILE_FRAME_T, PAL_WINDOW);
-        ui_set_tile(x, 14u, TILE_FRAME_B, PAL_WINDOW);
-    }
-    for (y = 4u; y != 14u; ++y) {
-        ui_set_tile(2u, y, TILE_FRAME_L, PAL_WINDOW);
-        ui_set_tile(17u, y, TILE_FRAME_R, PAL_WINDOW);
-    }
-}
-
 static void paint_draw_swatches(void)
 {
     paint_map_bank_one_tile(PAINT_PRIMARY_SWATCH_X, PAINT_SWATCH_Y,
@@ -137,19 +120,26 @@ static void paint_draw_swatches(void)
 
 static void paint_draw_controls(void)
 {
-    ui_text_clipped(1u, 15u, "SEL:A  A+B:CLEAR", PAL_WINDOW, 18u);
-    ui_text_clipped(1u, 16u, "START:DESKTOP", PAL_WINDOW, 18u);
+    ui_label_set(&paint_status_label,
+                 paint_clear_pending ? "Clearing canvas..." :
+                                       "Draw: hold A or B   Clear: A+B",
+                 TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u), 0u);
 }
 
 static void paint_draw_chrome(void)
 {
     ui_clear(PAL_DESKTOP);
-    ui_window(0u, 0u, 20u, 18u, "GB PAINT", 1u);
-    ui_menu(1u, 1u, 18u, "FILE  HELP");
-    ui_text(1u, 2u, "A:", PAL_WINDOW);
-    ui_text(5u, 2u, "B:", PAL_WINDOW);
-    ui_text(9u, 2u, "SELECT=A", PAL_WINDOW);
-    paint_draw_canvas_frame();
+    ui_window(0u, 0u, 20u, 18u, "Paint", 1u, UI_CLIENT_FACE);
+    ui_menu(1u, 1u, 18u, "File  Edit  Options  Help");
+    ui_sunken(PAINT_CANVAS_X_TILES, PAINT_CANVAS_Y_TILES,
+              PAINT_CANVAS_WIDTH_TILES, PAINT_CANVAS_HEIGHT_TILES);
+    ui_label(2u, PAINT_SWATCH_Y, 2u, "A", PAL_WINDOW,
+             TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u), TEXT_ALIGN_RIGHT);
+    ui_label(6u, PAINT_SWATCH_Y, 2u, "B", PAL_WINDOW,
+             TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u), TEXT_ALIGN_RIGHT);
+    ui_label(10u, PAINT_SWATCH_Y, 8u, "Select: color A", PAL_WINDOW,
+             TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u), 0u);
+    ui_label_init(&paint_status_label, 1u, 16u, 18u, PAL_WINDOW);
     paint_draw_controls();
 }
 
@@ -204,7 +194,7 @@ static void paint_begin_clear(void)
 {
     paint_clear_pending = 1u;
     paint_clear_next_tile = 0u;
-    ui_text_clipped(1u, 15u, "CLEARING CANVAS", PAL_WINDOW, 18u);
+    paint_draw_controls();
     audio_sfx(SFX_CLICK);
 }
 
@@ -231,7 +221,7 @@ static void paint_clear_step(void)
     }
 }
 
-void paint_enter(void)
+void paint_enter(void) BANKED
 {
     ui_scene_begin();
 
@@ -248,9 +238,6 @@ void paint_enter(void)
     paint_upload_canvas();
     paint_map_canvas();
     paint_draw_swatches();
-    if (paint_clear_pending) {
-        ui_text_clipped(1u, 15u, "CLEARING CANVAS", PAL_WINDOW, 18u);
-    }
 
     pointer_reset((UINT8)(PAINT_CANVAS_X_PIXELS + PAINT_CANVAS_WIDTH_PIXELS / 2u),
                   (UINT8)(PAINT_CANVAS_Y_PIXELS + PAINT_CANVAS_HEIGHT_PIXELS / 2u));
@@ -258,7 +245,7 @@ void paint_enter(void)
     ui_scene_end();
 }
 
-AppState paint_update(const InputState *input)
+AppState paint_update(const InputState *input) BANKED
 {
     UINT8 draw_buttons;
 

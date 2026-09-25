@@ -1,16 +1,23 @@
+#pragma bank 255
+
 #include <gb/gb.h>
+#include <gb/cgb.h>
 
 #include "assets.h"
 #include "audio.h"
 #include "cannon.h"
+#include "text.h"
 #include "ui.h"
 
 #define CANNON_FIELD_X 2u
-#define CANNON_FIELD_Y 2u
+#define CANNON_FIELD_Y 5u
 #define CANNON_FIELD_W 16u
-#define CANNON_FIELD_H 13u
+#define CANNON_FIELD_H 10u
 #define CANNON_ROW 14u
 #define CANNON_TARGET_BOTTOM 13u
+#define CANNON_SCORE_X 2u
+#define CANNON_HEADER_Y 2u
+#define CANNON_ART_LED 0u
 #define CANNON_TARGET_COUNT 3u
 #define CANNON_TARGET_PERIOD 24u
 #define CANNON_SHOT_PERIOD 2u
@@ -29,10 +36,18 @@ static const UINT8 cannon_lane_x[CANNON_TARGET_COUNT] = {
     4u, 9u, 14u
 };
 
+static const palette_color_t cannon_led_palette[] = {
+    RGB(24, 24, 24), RGB(31, 31, 31), RGB(31, 0, 0), RGB(0, 0, 0)
+};
+
 static CannonTarget cannon_targets[CANNON_TARGET_COUNT];
 static UINT8 cannon_x;
-static UINT8 cannon_score;
-static UINT8 cannon_lives;
+/* Exported so the emulator smoke test can observe the score. */
+UINT8 cannon_score;
+UINT8 cannon_lives;
+static UiLabel lives_label;
+static UiLabel message_label;
+static UiLabel restart_label;
 static UINT8 cannon_state;
 static UINT8 cannon_target_wait;
 static UINT8 cannon_spawn_phase;
@@ -50,15 +65,12 @@ static void cannon_blank(UINT8 x, UINT8 y)
 
 static void cannon_draw_status(void)
 {
-    ui_text_clipped(2u, 1u, "SCORE:", PAL_WINDOW, 6u);
-    ui_set_tile(8u, 1u,
-                assets_font_tile((char)('0' + (cannon_score / 10u))), PAL_WINDOW);
-    ui_set_tile(9u, 1u,
-                assets_font_tile((char)('0' + (cannon_score % 10u))), PAL_WINDOW);
-    ui_set_tile(10u, 1u, TILE_BLANK, PAL_WINDOW);
-    ui_text_clipped(11u, 1u, "LIVES:", PAL_WINDOW, 6u);
-    ui_set_tile(17u, 1u,
-                assets_font_tile((char)('0' + cannon_lives)), PAL_WINDOW);
+    static char lives_text[] = "Lives: 0";
+
+    ui_led_draw(CANNON_SCORE_X, CANNON_HEADER_Y, CANNON_ART_LED, cannon_score, 3u, PAL_APP_C);
+    lives_text[7] = (char)('0' + cannon_lives);
+    ui_label_set(&lives_label, lives_text, TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u),
+                 TEXT_ALIGN_RIGHT);
 }
 
 static void cannon_draw_target(UINT8 index)
@@ -83,15 +95,13 @@ static void cannon_finish(UINT8 result)
     ui_fill(CANNON_FIELD_X, CANNON_FIELD_Y,
             CANNON_FIELD_W, CANNON_FIELD_H, TILE_BLANK, PAL_MONO);
 
-    if (result == CANNON_WON) {
-        ui_text_clipped(5u, 7u, "CITY SAFE!", PAL_MONO, 10u);
-        ui_text_clipped(5u, 9u, "A:RESTART", PAL_MONO, 10u);
-        audio_sfx(SFX_WIN);
-    } else {
-        ui_text_clipped(4u, 7u, "DEFENSE DOWN", PAL_MONO, 12u);
-        ui_text_clipped(5u, 9u, "A:RESTART", PAL_MONO, 10u);
-        audio_sfx(SFX_ERROR);
-    }
+    ui_label_palette(&message_label, PAL_MONO);
+    ui_label_palette(&restart_label, PAL_MONO);
+    ui_label_set(&message_label, (result == CANNON_WON) ? "City safe!" : "Defense down",
+                 TEXT_COLORS(0u, 3u, 0u), TEXT_ALIGN_CENTER);
+    ui_label_set(&restart_label, "A: play again", TEXT_COLORS(0u, 2u, 0u),
+                 TEXT_ALIGN_CENTER);
+    audio_sfx((result == CANNON_WON) ? SFX_WIN : SFX_ERROR);
 }
 
 static void cannon_reset_game(void)
@@ -109,9 +119,9 @@ static void cannon_reset_game(void)
     cannon_shot_wait = 0u;
     cannon_x = 10u;
 
-    cannon_spawn_target(0u, 3u);
-    cannon_spawn_target(1u, 6u);
-    cannon_spawn_target(2u, 9u);
+    cannon_spawn_target(0u, 6u);
+    cannon_spawn_target(1u, 8u);
+    cannon_spawn_target(2u, 10u);
     for (index = 0u; index != CANNON_TARGET_COUNT; ++index) {
         cannon_draw_target(index);
     }
@@ -212,7 +222,7 @@ static void cannon_update_aim(const InputState *input)
 
     if (aim_x < 16u) aim_x = 16u;
     else if (aim_x > 136u) aim_x = 136u;
-    if (aim_y < 16u) aim_y = 16u;
+    if (aim_y < (UINT8)(CANNON_FIELD_Y * 8u)) aim_y = (UINT8)(CANNON_FIELD_Y * 8u);
     else if (aim_y > 104u) aim_y = 104u;
     pointer_move_to(aim_x, aim_y);
 
@@ -239,19 +249,28 @@ static void cannon_fire(void)
     if (cannon_hit_target()) cannon_shot_active = 0u;
 }
 
-void cannon_enter(void)
+void cannon_enter(void) BANKED
 {
     ui_scene_begin();
     pointer_hide();
+    set_bkg_palette(PAL_APP_C, 1u, cannon_led_palette);
+    ui_led_load(CANNON_ART_LED);
     ui_clear(PAL_DESKTOP);
-    ui_window(1u, 0u, 18u, 18u, "CANNON", 1u);
-    ui_text_clipped(2u, 15u, "A:FIRE  B:RESET", PAL_WINDOW, 16u);
-    ui_text_clipped(2u, 16u, "START:DESKTOP", PAL_WINDOW, 16u);
+    ui_window(0u, 0u, 20u, 18u, "Cannon", 1u, UI_CLIENT_FACE);
+    ui_menu(1u, 1u, 18u, "Game  Help");
+    ui_sunken(CANNON_FIELD_X, CANNON_FIELD_Y, CANNON_FIELD_W, CANNON_FIELD_H);
+    ui_label_init(&lives_label, 12u, CANNON_HEADER_Y, 6u, PAL_WINDOW);
+    ui_label(6u, CANNON_HEADER_Y, 6u, "Score", PAL_WINDOW,
+             TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u), 0u);
+    ui_label(2u, 16u, 16u, "A fire   B reset   Start close", PAL_WINDOW,
+             TEXT_COLORS(COLOR_GREY, COLOR_BLACK, 0u), 0u);
+    ui_label_init(&message_label, 4u, 9u, 12u, PAL_MONO);
+    ui_label_init(&restart_label, 4u, 11u, 12u, PAL_MONO);
     cannon_reset_game();
     ui_scene_end();
 }
 
-AppState cannon_update(const InputState *input)
+AppState cannon_update(const InputState *input) BANKED
 {
     if (input->pressed & J_START) {
         pointer_hide();

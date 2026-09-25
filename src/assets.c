@@ -1,16 +1,27 @@
+#pragma bank 255
+
 #include <gb/gb.h>
 #include <gb/cgb.h>
 
 #include "assets.h"
+#include "ui.h"
 
 static const palette_color_t background_palettes[] = {
+    /* 0 desktop */
     RGB(0, 25, 25), RGB(0, 15, 17), RGB(31, 31, 31), RGB(0, 0, 0),
-    RGB(24, 24, 24), RGB(31, 31, 31), RGB(13, 13, 13), RGB(0, 0, 0),
-    RGB(0, 0, 22), RGB(3, 9, 31), RGB(0, 0, 10), RGB(31, 31, 31),
-    RGB(20, 20, 20), RGB(29, 29, 29), RGB(11, 11, 11), RGB(0, 0, 0),
-    RGB(24, 24, 24), RGB(31, 27, 0), RGB(0, 23, 28), RGB(0, 0, 0),
+    /* 1 window: white, face grey, shadow, black */
+    RGB(31, 31, 31), RGB(24, 24, 24), RGB(13, 13, 13), RGB(0, 0, 0),
+    /* 2 active title: navy, blue, near-black, white */
+    RGB(0, 0, 22), RGB(3, 9, 31), RGB(0, 0, 8), RGB(31, 31, 31),
+    /* 3 app A (default mirrors the window palette) */
+    RGB(31, 31, 31), RGB(24, 24, 24), RGB(13, 13, 13), RGB(0, 0, 0),
+    /* 4 icons */
+    RGB(31, 31, 31), RGB(31, 27, 0), RGB(0, 23, 28), RGB(0, 0, 0),
+    /* 5 app B */
     RGB(24, 24, 24), RGB(0, 7, 26), RGB(29, 0, 0), RGB(0, 0, 0),
+    /* 6 mono: BIOS, DOS, Paint canvas and Cannon field */
     RGB(0, 0, 0), RGB(10, 10, 10), RGB(22, 22, 22), RGB(31, 31, 31),
+    /* 7 app C */
     RGB(0, 0, 19), RGB(31, 31, 31), RGB(3, 9, 27), RGB(0, 0, 0)
 };
 
@@ -25,7 +36,7 @@ typedef char static_tiles_must_not_overlap_pointer[
     (TILE_STATIC_COUNT <= TILE_POINTER_SPRITE) ? 1 : -1
 ];
 
-/* Rows are five-bit glyphs for ASCII 32 through 95. */
+/* Rows are five-bit glyphs for ASCII 32 through 95 (BIOS and DOS text). */
 static const UINT8 font_rows[64][7] = {
     {0,0,0,0,0,0,0}, {4,4,4,4,4,0,4}, {10,10,10,0,0,0,0},
     {10,31,10,10,31,10,0}, {4,15,20,14,5,30,4}, {24,25,2,4,8,19,3},
@@ -111,99 +122,100 @@ static void build_font(void)
     }
 }
 
-static void build_frame_tile(UINT8 tile)
+/* Window chrome in PAL_WINDOW colours: 0 white, 1 grey, 2 shadow, 3 black.
+ * The title row has no top border so title bars sit flush with the frame. */
+static const char chrome_art[] =
+    /* TILE_FRAME_TL: frame plus the left part of the system-menu box */
+    "31131111" "31131111" "31131111" "31131133"
+    "31131130" "31131133" "31131112" "31131111"
+    /* TILE_FRAME_T: plain top border for untitled panels */
+    "33333333" "11111111" "11111111" "33333333"
+    "00000000" "00000000" "00000000" "00000000"
+    /* TILE_FRAME_TR */
+    "31113113" "31113113" "31113113" "31113113"
+    "31113113" "31113113" "31113113" "31113113"
+    /* TILE_FRAME_L */
+    "31130000" "31130000" "31130000" "31130000"
+    "31130000" "31130000" "31130000" "31130000"
+    /* TILE_FRAME_R */
+    "00003113" "00003113" "00003113" "00003113"
+    "00003113" "00003113" "00003113" "00003113"
+    /* TILE_FRAME_BL */
+    "31130000" "31130000" "31130000" "31130000"
+    "31133333" "31111111" "31111111" "33333333"
+    /* TILE_FRAME_B */
+    "00000000" "00000000" "00000000" "00000000"
+    "33333333" "11111111" "11111111" "33333333"
+    /* TILE_FRAME_BR */
+    "00003113" "00003113" "00003113" "00003113"
+    "33333113" "11111113" "11111113" "33333333"
+    /* TILE_SYSTEM_BUTTON: the bar of the system-menu box */
+    "11111113" "11111113" "11111113" "33333313"
+    "00000323" "33333323" "22222223" "11111113"
+    /* TILE_MIN_BUTTON */
+    "30000002" "30111112" "30111112" "30333332"
+    "30133312" "30113112" "30111112" "32222222"
+    /* TILE_MAX_BUTTON */
+    "30000002" "30111112" "30113112" "30133312"
+    "30333332" "30111112" "30111112" "32222222";
+
+static const char sunken_art[] =
+    /* TILE_SUNK_TL */
+    "11111111" "11111111" "11111111" "11111111"
+    "11111111" "11111111" "11111122" "11111123"
+    /* TILE_SUNK_T */
+    "11111111" "11111111" "11111111" "11111111"
+    "11111111" "11111111" "22222222" "33333333"
+    /* TILE_SUNK_TR */
+    "11111111" "11111111" "11111111" "11111111"
+    "11111111" "11111111" "20111111" "00111111"
+    /* TILE_SUNK_L */
+    "11111123" "11111123" "11111123" "11111123"
+    "11111123" "11111123" "11111123" "11111123"
+    /* TILE_SUNK_R */
+    "00111111" "00111111" "00111111" "00111111"
+    "00111111" "00111111" "00111111" "00111111"
+    /* TILE_SUNK_BL */
+    "11111120" "11111100" "11111111" "11111111"
+    "11111111" "11111111" "11111111" "11111111"
+    /* TILE_SUNK_B */
+    "00000000" "00000000" "11111111" "11111111"
+    "11111111" "11111111" "11111111" "11111111"
+    /* TILE_SUNK_BR */
+    "00111111" "00111111" "11111111" "11111111"
+    "11111111" "11111111" "11111111" "11111111";
+
+/* Frame edges for windows whose client area is the grey face colour. */
+static const char face_frame_art[] =
+    /* TILE_FRAME_L_FACE */
+    "31131111" "31131111" "31131111" "31131111"
+    "31131111" "31131111" "31131111" "31131111"
+    /* TILE_FRAME_R_FACE */
+    "11113113" "11113113" "11113113" "11113113"
+    "11113113" "11113113" "11113113" "11113113"
+    /* TILE_FRAME_BL_FACE */
+    "31131111" "31131111" "31131111" "31131111"
+    "31133333" "31111111" "31111111" "33333333"
+    /* TILE_FRAME_B_FACE */
+    "11111111" "11111111" "11111111" "11111111"
+    "33333333" "11111111" "11111111" "33333333"
+    /* TILE_FRAME_BR_FACE */
+    "11113113" "11113113" "11113113" "11113113"
+    "33333113" "11111113" "11111113" "33333333";
+
+static void build_misc_tiles(void)
 {
-    tile_clear(0u);
+    tile_clear(0u); load_current_tile(TILE_BLANK);
+    tile_clear(3u); load_current_tile(TILE_SOLID);
+    tile_clear(1u); load_current_tile(TILE_FACE);
 
-    switch (tile) {
-        case TILE_FRAME_TL:
-            tile_hline(0u, 0u, 7u, 1u); tile_vline(0u, 0u, 7u, 1u);
-            tile_hline(7u, 1u, 7u, 2u); tile_vline(7u, 1u, 7u, 2u);
-            break;
-        case TILE_FRAME_T:
-            tile_hline(0u, 0u, 7u, 1u); tile_hline(7u, 0u, 7u, 2u);
-            break;
-        case TILE_FRAME_TR:
-            tile_hline(0u, 0u, 7u, 1u); tile_vline(6u, 1u, 7u, 2u);
-            tile_vline(7u, 0u, 7u, 3u); tile_hline(7u, 0u, 6u, 2u);
-            break;
-        case TILE_FRAME_L:
-            tile_vline(0u, 0u, 7u, 1u); tile_vline(7u, 0u, 7u, 2u);
-            break;
-        case TILE_FRAME_R:
-            tile_vline(6u, 0u, 7u, 2u); tile_vline(7u, 0u, 7u, 3u);
-            break;
-        case TILE_FRAME_BL:
-            tile_vline(0u, 0u, 6u, 1u); tile_hline(6u, 0u, 7u, 2u);
-            tile_hline(7u, 0u, 7u, 3u); tile_vline(7u, 0u, 6u, 2u);
-            break;
-        case TILE_FRAME_B:
-            tile_hline(6u, 0u, 7u, 2u); tile_hline(7u, 0u, 7u, 3u);
-            break;
-        default:
-            tile_hline(6u, 0u, 7u, 2u); tile_hline(7u, 0u, 7u, 3u);
-            tile_vline(6u, 0u, 7u, 2u); tile_vline(7u, 0u, 7u, 3u);
-            break;
-    }
-    load_current_tile(tile);
-}
+    tile_clear(0u); tile_hline(3u, 1u, 6u, 3u); tile_vline(3u, 1u, 6u, 3u);
+    load_current_tile(TILE_CURSOR_MARK);
 
-static void build_button(UINT8 tile)
-{
-    tile_clear(0u);
-    tile_hline(0u, 0u, 7u, 1u); tile_vline(0u, 0u, 7u, 1u);
-    tile_hline(7u, 0u, 7u, 3u); tile_vline(7u, 0u, 7u, 3u);
-
-    if (tile == TILE_SYSTEM_BUTTON) {
-        tile_hline(3u, 2u, 5u, 3u); tile_hline(5u, 2u, 5u, 3u);
-    } else if (tile == TILE_MIN_BUTTON) {
-        tile_hline(5u, 2u, 5u, 3u);
-    } else {
-        tile_hline(2u, 2u, 5u, 3u); tile_hline(5u, 2u, 5u, 3u);
-        tile_vline(2u, 2u, 5u, 3u); tile_vline(5u, 2u, 5u, 3u);
-    }
-    load_current_tile(tile);
-}
-
-static void build_minesweeper_tiles(void)
-{
-    UINT8 tile;
-    UINT8 row;
-    UINT8 bits;
-    UINT8 color;
-
-    tile_clear(0u);
-    tile_hline(0u, 0u, 7u, 1u); tile_vline(0u, 0u, 7u, 1u);
-    tile_hline(7u, 0u, 7u, 3u); tile_vline(7u, 0u, 7u, 3u);
-    load_current_tile(TILE_MS_HIDDEN);
-
-    tile_clear(0u);
-    tile_vline(3u, 2u, 6u, 3u); tile_hline(6u, 1u, 5u, 3u);
-    tile_hline(2u, 3u, 6u, 2u); tile_hline(3u, 3u, 5u, 2u);
-    load_current_tile(TILE_MS_FLAG);
-
-    tile_clear(0u);
-    tile_hline(3u, 1u, 6u, 3u); tile_hline(4u, 1u, 6u, 3u);
-    tile_vline(3u, 1u, 6u, 3u); tile_vline(4u, 1u, 6u, 3u);
-    tile_pixel(0u, 0u, 3u); tile_pixel(7u, 0u, 3u);
-    tile_pixel(0u, 7u, 3u); tile_pixel(7u, 7u, 3u);
-    load_current_tile(TILE_MS_MINE);
-
-    tile_clear(2u);
-    tile_hline(3u, 1u, 6u, 3u); tile_hline(4u, 1u, 6u, 3u);
-    tile_vline(3u, 1u, 6u, 3u); tile_vline(4u, 1u, 6u, 3u);
-    load_current_tile(TILE_MS_EXPLODED);
-
-    for (tile = TILE_MS_NUM_1; tile <= TILE_MS_NUM_8; ++tile) {
-        tile_clear(0u);
-        color = (UINT8)(((tile - TILE_MS_NUM_1) % 3u) + 1u);
-        for (row = 0u; row != 7u; ++row) {
-            bits = (UINT8)(font_rows[(UINT8)('1' - ' ') + tile - TILE_MS_NUM_1][row] << 2u);
-            tile_buffer[row * 2u] = (color & 1u) ? bits : 0u;
-            tile_buffer[row * 2u + 1u] = (color & 2u) ? bits : 0u;
-        }
-        load_current_tile(tile);
-    }
+    tile_clear(0u); tile_hline(6u, 1u, 6u, 2u); tile_hline(5u, 2u, 5u, 2u);
+    tile_vline(4u, 2u, 5u, 3u); load_current_tile(TILE_CANNON);
+    tile_clear(0u); tile_pixel(3u, 3u, 2u); tile_pixel(4u, 3u, 2u);
+    tile_pixel(3u, 4u, 2u); tile_pixel(4u, 4u, 2u); load_current_tile(TILE_TARGET);
 }
 
 /*
@@ -339,26 +351,6 @@ static void build_icons(void)
     }
 }
 
-static void build_misc_tiles(void)
-{
-    tile_clear(0u); load_current_tile(TILE_BLANK);
-    tile_clear(3u); load_current_tile(TILE_SOLID);
-
-    tile_clear(0u); tile_hline(3u, 1u, 6u, 3u); tile_vline(3u, 1u, 6u, 3u);
-    load_current_tile(TILE_CURSOR_MARK);
-
-    tile_clear(0u); tile_vline(0u, 0u, 7u, 3u); tile_vline(7u, 0u, 7u, 3u);
-    tile_hline(7u, 0u, 7u, 3u); load_current_tile(TILE_KEY_WHITE);
-    tile_clear(1u); tile_vline(0u, 0u, 7u, 3u); tile_vline(7u, 0u, 7u, 3u);
-    tile_hline(7u, 0u, 7u, 3u); load_current_tile(TILE_KEY_WHITE_ACTIVE);
-    tile_clear(3u); tile_hline(7u, 0u, 7u, 2u); load_current_tile(TILE_KEY_BLACK);
-
-    tile_clear(0u); tile_hline(6u, 1u, 6u, 2u); tile_hline(5u, 2u, 5u, 2u);
-    tile_vline(4u, 2u, 5u, 3u); load_current_tile(TILE_CANNON);
-    tile_clear(0u); tile_pixel(3u, 3u, 2u); tile_pixel(4u, 3u, 2u);
-    tile_pixel(3u, 4u, 2u); tile_pixel(4u, 4u, 2u); load_current_tile(TILE_TARGET);
-}
-
 static void build_pointer(void)
 {
     static const UINT8 pointer_tile[16] = {
@@ -375,30 +367,21 @@ static void build_pointer(void)
     set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tile);
 }
 
-void assets_load(void)
+void assets_restore_palettes(void) BANKED
 {
-    UINT8 tile;
-
-    VBK_REG = VBK_TILES;
-    build_font();
-    build_misc_tiles();
-    for (tile = TILE_FRAME_TL; tile <= TILE_FRAME_BR; ++tile) build_frame_tile(tile);
-    build_button(TILE_SYSTEM_BUTTON);
-    build_button(TILE_MIN_BUTTON);
-    build_button(TILE_MAX_BUTTON);
-    build_minesweeper_tiles();
-    build_icons();
-    build_pointer();
-    VBK_REG = VBK_TILES;
-
     set_bkg_palette(0u, 8u, background_palettes);
     set_sprite_palette(0u, 1u, pointer_palette);
 }
 
-UINT8 assets_font_tile(char c)
+void assets_load(void) BANKED
 {
-    UINT8 value = (UINT8)c;
-    if (value >= (UINT8)'a' && value <= (UINT8)'z') value = (UINT8)(value - 32u);
-    if (value < 32u || value > 95u) value = (UINT8)'?';
-    return (UINT8)(value - 32u);
+    VBK_REG = VBK_BANK_0;
+    build_font();
+    build_misc_tiles();
+    ui_art_load(0u, TILE_FRAME_TL, 11u, chrome_art);
+    ui_art_load(0u, TILE_SUNK_TL, 8u, sunken_art);
+    ui_art_load(0u, TILE_FRAME_L_FACE, 5u, face_frame_art);
+    build_icons();
+    build_pointer();
+    assets_restore_palettes();
 }

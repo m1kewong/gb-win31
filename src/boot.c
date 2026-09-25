@@ -1,3 +1,5 @@
+#pragma bank 255
+
 #include <gb/gb.h>
 
 #include "assets.h"
@@ -13,7 +15,7 @@ static void boot_line(UINT8 y, const char *text)
     ui_text(1u, y, text, PAL_MONO);
 }
 
-void boot_enter(void)
+void boot_enter(void) BANKED
 {
     ui_scene_begin();
     pointer_hide();
@@ -33,7 +35,7 @@ void boot_enter(void)
     audio_sfx(SFX_BOOT);
 }
 
-AppState boot_update(const InputState *input)
+AppState boot_update(const InputState *input) BANKED
 {
     if (input->pressed & J_START) return APP_DESKTOP;
     if (input->pressed & J_A) return APP_DOS;
@@ -52,16 +54,20 @@ static void dos_draw_step(void)
         default:
             ui_scene_begin();
             ui_clear(PAL_DESKTOP);
-            ui_window(2u, 3u, 16u, 11u, "GBWORKBENCH", 1u);
-            ui_text(5u, 7u, "GB WORKBENCH", PAL_TITLE_ACTIVE);
-            ui_text(4u, 9u, "STARTING...", PAL_WINDOW);
+            ui_window(2u, 4u, 16u, 9u, "GB Workbench", 1u, UI_CLIENT_WHITE);
+            ui_label(3u, 7u, 14u, "GB Workbench", PAL_TITLE_ACTIVE,
+                     TEXT_COLORS(3u, 3u, 0u), (UINT8)(TEXT_ALIGN_CENTER | TEXT_BOX));
+            ui_label(3u, 8u, 14u, "Version 3.10", PAL_WINDOW,
+                     TEXT_INK_ON_PAPER, TEXT_ALIGN_CENTER);
+            ui_label(3u, 10u, 14u, "Starting...", PAL_WINDOW,
+                     TEXT_INK_ON_PAPER, TEXT_ALIGN_CENTER);
             ui_scene_end();
             splash_frames = 0u;
             break;
     }
 }
 
-void dos_enter(void)
+void dos_enter(void) BANKED
 {
     ui_scene_begin();
     pointer_hide();
@@ -73,7 +79,7 @@ void dos_enter(void)
     ui_scene_end();
 }
 
-AppState dos_update(const InputState *input)
+AppState dos_update(const InputState *input) BANKED
 {
     if (input->pressed & J_START) return APP_DESKTOP;
 

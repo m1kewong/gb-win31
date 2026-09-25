@@ -25,6 +25,12 @@ def main() -> None:
         fail(f"unexpected title {title!r}")
     if rom[0x143] != 0xC0:
         fail(f"CGB flag is 0x{rom[0x143]:02x}, expected CGB-only 0xc0")
+    if rom[0x147] != 0x1B:
+        fail(f"cartridge type is 0x{rom[0x147]:02x}, expected MBC5+RAM+BATTERY 0x1b")
+    if (0x8000 << rom[0x148]) != len(rom):
+        fail(f"ROM size code 0x{rom[0x148]:02x} does not match {len(rom)} bytes")
+    if rom[0x149] != 0x02:
+        fail(f"RAM size code is 0x{rom[0x149]:02x}, expected 8 KiB (0x02)")
 
     header_checksum = 0
     for value in rom[0x134:0x14D]:
@@ -40,7 +46,7 @@ def main() -> None:
 
     print(
         f"ROM OK: {path} | {len(rom) // 1024} KiB | "
-        f"title={title!r} | CGB-only | checksums valid"
+        f"title={title!r} | CGB-only | MBC5+RAM+BATTERY | checksums valid"
     )
 
 

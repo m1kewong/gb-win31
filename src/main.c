@@ -13,6 +13,10 @@
 #include "cannon.h"
 #include "ui.h"
 
+/* 0x80 | scene that finished entering; emulator tests synchronise on it.
+ * Bit 7 keeps it distinct from WRAM that is still zero during boot. */
+UINT8 gbw_scene;
+
 static void enter_state(AppState state)
 {
     switch (state) {
@@ -24,8 +28,9 @@ static void enter_state(AppState state)
         case APP_PIANO: piano_enter(); break;
         case APP_MEDIA: media_enter(); break;
         case APP_CANNON: cannon_enter(); break;
-        default: desktop_enter(); break;
+        default: state = APP_DESKTOP; desktop_enter(); break;
     }
+    gbw_scene = (UINT8)(0x80u | (UINT8)state);
 }
 
 static AppState update_state(AppState state, const InputState *input)
