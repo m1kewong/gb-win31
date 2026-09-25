@@ -17,6 +17,7 @@ void input_init(void)
 void input_update(void)
 {
     UINT8 directions;
+    UINT8 previous_directions;
 
     input_state.held = joypad();
     input_state.pressed = (UINT8)(input_state.held & (UINT8)~previous_held);
@@ -24,9 +25,10 @@ void input_update(void)
     input_state.repeated = input_state.pressed;
 
     directions = (UINT8)(input_state.held & (J_UP | J_DOWN | J_LEFT | J_RIGHT));
+    previous_directions = (UINT8)(previous_held & (J_UP | J_DOWN | J_LEFT | J_RIGHT));
     if (directions == 0u) {
         repeat_frames = 0u;
-    } else if ((input_state.pressed & directions) != 0u) {
+    } else if (directions != previous_directions) {
         repeat_frames = 0u;
     } else {
         if (repeat_frames < 16u) {
