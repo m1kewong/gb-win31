@@ -1,66 +1,64 @@
 # GB Win 3.1 verification report
 
-Date: 2026-08-04
+Date: 2026-09-25
 
-## Rebuild result
+## Build result
 
-The original snapshot at commit `5676292` was not reproducible from its source.
-The rebuild replaces the mismatched state, tile, palette, Paint, Sweeper, and
-build paths with a clean-room CGB-only implementation.
+The cartridge is `build/gb-win31.gbc`: 32 KiB, title `GB WORKBENCH`, CGB flag
+`0xC0`, cartridge type `0x1B` (MBC5 + RAM + battery), 8 KiB SRAM, and valid
+header/global checksums. Its SHA-256 is
+`521a6dd870172a01e6e3dfd7da061ede1d411681e388ef65dc7bed82a8b1e6b3`.
 
-The generated cartridge is `build/gb-win31.gbc`: 32 KiB, title
-`GB WORKBENCH`, CGB flag `0xC0`, and valid header/global checksums.
-Its SHA-256 is
-`1d6fb920e8905ac668e1e99c1da2e66a99d31241c9de2518d0fa887b122a018c`;
-the active 16 KiB ROM bank uses 14,700 bytes (90%), leaving 1,684 bytes.
-WRAM uses 2,825 of 4,096 bytes, leaving 1,271 bytes.
+| Region | Used | Free |
+| --- | --- | --- |
+| ROM bank 0 (fixed) | 7,588 B (46%) | 8,796 B |
+| ROM bank 1 (switchable) | 14,026 B (86%) | 2,358 B |
+| WRAM 0xC000-0xCFFF | 3,384 B (83%) | 712 B |
+
+Before this pass the whole program lived in bank 0 at 90% usage. Scenes and
+asset builders are now auto-banked; engine code (main loop, input, UI, text,
+audio, game models) stays in bank 0. Further code spills into new banks
+automatically.
+
+The previous build (`1d6fb920...`, recorded 2026-08-04) was reproduced
+byte-for-byte with GBDK 4.5.0 before any change.
 
 ## Automated checks
 
 - GBDK 4.5.0 compiles all ROM sources without diagnostics.
-- The host Sweeper suite covers initialization, all first-click positions,
-  deterministic mine placement, adjacency, flags, iterative flood fill,
-  bounds guards, loss, and win.
-- The same model suite passes AddressSanitizer and UndefinedBehaviorSanitizer;
-  leak detection is disabled because it is unavailable in the sandbox.
-- PyBoy 2.7.0 drives the complete boot-to-desktop journey and every app. The
-  interaction smoke covers empty-space clicks, pixel drawing, flag/reveal/reset,
-  Piano note dispatch, Media persistence, and Cannon score/reset in one
-  deterministic journey.
-- Nine deterministic 160 x 144 frames compare pixel-for-pixel with
-  `tests/golden/`.
-- Desktop detection is anchored to the complete 2 x 2 Paint icon rather than
-  the old full-tile title text, so the packed desktop font remains testable.
-- Cursor regression coverage verifies 8 x 8 sprite mode, transparent right and
-  bottom padding, and the `(152, 136)` bottom-right on-screen position.
-- `tools/verify_rom.py` checks cartridge size alignment, title, CGB-only flag,
-  and both checksums.
+- `make test`: the host Sweeper suite (initialisation, every first-click
+  position, deterministic mines, adjacency, flags, iterative flood fill,
+  bounds guards, loss, win) passes with `-Wall -Wextra -Werror`, and the
+  generated font table matches `assets/system_font.txt`.
+- `make verify`: size, title, CGB-only flag, MBC5 type, ROM/RAM size codes and
+  both checksums.
+- `make smoke-test` (PyBoy 2.7.0), synchronised on the exported `gbw_scene`
+  byte rather than on rendered text:
+  - boot quick-start to desktop, 8x8 pointer with transparent padding;
+  - empty desktop click changes nothing;
+  - Paint writes the expected bank-1 pixel bytes;
+  - Sweeper opens over the Program Manager, flags (LED 010 -> 009), reveals,
+    resets from the smiley, and closes from its system box;
+  - Piano selects D (pressed key art) and calls `audio_note`;
+  - Media plays, changes track, keeps playing after leaving, and stops;
+  - Cannon scores, resets score and lives, and exits;
+  - pointer reaches the (152, 136) bottom-right bound.
+- `make visual-test`: nine deterministic 160 x 144 frames compare
+  pixel-for-pixel with `tests/golden/`. Three consecutive captures were
+  identical.
 
 ## Manual review gates passed
 
-- BIOS, fake DOS, splash, Program Manager, and all five applications are
-  legible at native resolution.
-- The Program Manager matches the selected dual-group design: captions occupy
-  independent 32-pixel cells, active and inactive groups are distinct, the
-  triangular pointer sits below the selected caption, and the compact `W`
-  remains readable in `WINDOW` and `SWEEPER`.
-- Source and implementation were compared together at the same 160 x 144
-  viewport and at 4x nearest-neighbor zoom; `design-qa.md` records a pass.
-- Every application can be launched and closed without a blocking input loop.
-- Paint changes individual pixels and uploads only affected mutable tiles.
-- Sweeper never uses recursive reveal and its first revealed cell is safe.
-- Media music continues after returning to the desktop.
-- Whole-scene redraws disable the LCD instead of misusing the CGB background
-  priority bit, preventing exposed partial redraws.
+- Every frame was reviewed at 1x and 3x nearest-neighbour zoom against the
+  CC0 Windows 3.1 Program Manager reference and GBS Windows review photos.
+- Mixed-case text is legible at native resolution; no status line is clipped.
+- Windowed apps (Sweeper, Piano, Media) show the Program Manager behind them
+  with inactive title bars; maximised apps (Paint, Cannon) fill the screen.
+- Labels are drawn from a per-scene tile pool that is sized at scene entry;
+  repeated Cannon rounds reuse pre-allocated labels.
 
 ## Remaining release gates
 
-- Add a true overlapping/minimizing window manager and functional title-bar
-  controls.
-- Add app-specific pixel-art polish outside the completed Program Manager pass.
-- Add Sweeper difficulty selection and Paint tools/persistence.
-- Add printer support only after disconnected/cancel behavior is designed.
-- Run the documented SameBoy, mGBA, real GBC/GBA, and flashcart smoke matrix.
-
-These remaining gates are why the current build is called a functional first
-vertical slice, not finished commercial-reference parity.
+See the backlog in `docs/STOCKTAKE.md`: Solitaire, arrow pointer, Sweeper board
+sizes, Paint tools and saves, minimise/restore, Cannon art, printer, and the
+real-hardware matrix.

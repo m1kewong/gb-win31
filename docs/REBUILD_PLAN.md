@@ -46,23 +46,30 @@ Captured evidence is kept under `docs/baseline/`.
    renders dirty regions, and advances audio.
 2. A small state router owns boot, DOS, Program Manager, and each application.
    State entry is explicit; there are no orphan `INIT` enum values.
-3. Bank 0 background tiles contain the compact font, window chrome, icons, and
-   application UI. Bank 1 is reserved for mutable Paint canvas tiles.
+3. VRAM bank 0 holds the fixed BIOS font, window chrome, icons, the pointer,
+   and persistent Program Manager text. VRAM bank 1 holds per-scene
+   application art (tiles 0-143, including the Paint canvas) and a per-scene
+   pool of proportional-font label tiles (144-255).
 4. Every palette and tile range is declared in one manifest with compile-time
-   bounds checks.
+   bounds checks. Palettes 0, 1, 2 and 4 are system palettes; scenes may
+   reload 3, 5, 6 and 7.
 5. The pointer is a sprite. Windows and apps use the background map plus CGB
    attributes, with redraws batched at state changes or limited to dirty tiles.
 6. Game logic that does not need hardware registers remains host-testable.
 
-## Implementation status - 2026-08-04
+## Implementation status - 2026-09-25
 
 | Slice | Status | Evidence | Remaining work |
 | --- | --- | --- | --- |
-| 0 | Complete | Reproducible GBDK 4.5.0 build, CGB-only header/checksum verifier, host tests | Add a tagged release workflow |
-| 1 | Complete design pass | BIOS, DOS, splash, dual-group Program Manager, packed desktop font, original icons, pointer, five launchable apps, native golden frames | Functional group minimize/maximize controls |
-| 2 | Playable first pass | Safe deterministic Sweeper model and true-pixel persistent Paint canvas | Difficulty chooser, Paint save/load, extra palettes/tools |
-| 3 | Playable first pass | Piano tones, four original Media tracks with background playback, complete Cannon score/lives loop | Tempo/rhythm controls and a real minimize/overlap window manager |
-| 4 | Not started | Roadmap below | Printer, SRAM, SameBoy/mGBA and physical-hardware matrix |
+| 0 | Complete | Reproducible GBDK 4.5.0 build; MBC5 + 8 KiB SRAM with auto-banking; header, type and checksum verifier; host tests | Add a tagged release workflow |
+| 1 | Complete, 3.1 chrome pass | Mixed-case proportional font, white clients, menu rules, Win 3.1 title buttons, apps drawn over an inactive Program Manager, golden frames | Arrow pointer with tail; functional minimise/maximise |
+| 2 | Playable, restyled | Sweeper with LED counters, smiley and raised cells; true-pixel Paint with sunken canvas and swatches | Board sizes, Paint tools and SRAM save |
+| 3 | Playable, restyled | Piano keyboard art, Media LCD and transport buttons, Cannon LED score | Tempo/rhythm controls, Cannon scenery |
+| 3.5 | Next | Solitaire (Klondike), the improvement over GBS Windows | Model, host tests, card art, pointer play, win cascade |
+| 4 | Not started | Roadmap below | Printer, SRAM persistence, SameBoy/mGBA and physical-hardware matrix |
+
+The GBS Windows comparison that set these priorities is in
+`docs/STOCKTAKE.md`.
 
 The nine golden screens lock this implementation against accidental visual
 regression. They are not a claim that clean-room reference parity is finished.

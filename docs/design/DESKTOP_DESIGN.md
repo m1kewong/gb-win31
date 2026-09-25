@@ -32,7 +32,25 @@ Accessory cell centers are 32, 80, and 128 pixels. Game cell centers are 48
 and 112 pixels. Each app caption is rendered into an independent 32-pixel cell,
 so no label can touch a neighbor or replace a frame tile.
 
-## Visual rules
+## Revision 2 - Windows 3.1 chrome pass (2026-09-25)
+
+The layout above is unchanged; the surface treatment moved closer to Windows
+3.1 after the GBS Windows stock-take (`docs/STOCKTAKE.md`):
+
+- All window text uses the original mixed-case proportional system font
+  (`assets/system_font.txt`, cap height 6, x-height 4, 1-pixel descender).
+- Client areas and menu bars are white; menus end in a black rule.
+- Window frames are 4 pixels thick inside their 8-pixel tiles, leaving white
+  padding; windows with grey clients use face-coloured frame variants.
+- Title bars centre their text. Active titles are white on navy; inactive
+  titles are black on white. Title buttons are the system-menu bar and the
+  down/up arrow buttons.
+- Captions are rendered into per-icon tile strips centred on the icon. The
+  selected caption gets a tight navy box instead of a full-cell fill.
+- Application windows (Sweeper, Piano, Media) are drawn over the Program
+  Manager, which switches to inactive titles behind them.
+
+## Visual rules (revision 1)
 
 - Use a packed 3 x 5 glyph on a 4-pixel advance for desktop text only.
 - Keep the existing application font unchanged.

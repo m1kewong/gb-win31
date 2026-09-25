@@ -1,5 +1,15 @@
 # Desktop option 2 design QA
 
+## Revision 2 (2026-09-25)
+
+The Windows 3.1 chrome pass (see `docs/design/DESKTOP_DESIGN.md`, revision 2)
+replaces the 3 x 5 capitals with the mixed-case system font, turns client
+areas white, and adds menu rules and 3.1 title buttons. The layout, icon art
+and selection behaviour below are unchanged. The current rendered desktop is
+`tests/golden/desktop.png`; it was reviewed at 1x and 3x nearest-neighbour
+against the CC0 Program Manager reference with no P0-P2 findings. The findings
+below describe revision 1.
+
 ## Comparison target
 
 - Source visual truth: `docs/design/desktop-option-2-selected-160x144.png`
