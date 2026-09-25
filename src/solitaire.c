@@ -431,9 +431,16 @@ static UINT8 face_up_count(UINT8 column)
     return (UINT8)(solitaire.tableau_count[column] - solitaire.tableau_hidden[column]);
 }
 
+/* Aim at the lower body of a full card and the right end of a column strip so
+ * the arrow never hides the rank and suit in the top-left corner. */
+#define SOL_POINT_BODY_X 10u
+#define SOL_POINT_BODY_Y 10u
+#define SOL_POINT_STRIP_X 12u
+#define SOL_POINT_STRIP_Y 4u
+
 static void place_pointer(void)
 {
-    UINT8 x = (UINT8)((SOL_COLUMN_X(cursor_col) << 3u) + 8u);
+    UINT8 x = (UINT8)(SOL_COLUMN_X(cursor_col) << 3u);
     UINT8 y;
     UINT8 count;
     UINT8 index;
@@ -445,21 +452,27 @@ static void place_pointer(void)
     if (cursor_row == SOL_ROW_TOP) {
         if (cursor_col == 1u && solitaire.draw_count == 3u && solitaire.waste_count > 1u) {
             index = (solitaire.waste_count >= SOL_WASTE_FAN_MAX) ? SOL_WASTE_FAN_MAX : solitaire.waste_count;
-            x = (UINT8)(((SOL_WASTE_X + index - 1u) << 3u) + 8u);
+            x = (UINT8)((SOL_WASTE_X + index - 1u) << 3u);
         }
-        pointer_move_to(x, (UINT8)((SOL_TOP_Y << 3u) + 5u));
+        pointer_move_to((UINT8)(x + SOL_POINT_BODY_X),
+                        (UINT8)((SOL_TOP_Y << 3u) + SOL_POINT_BODY_Y));
         return;
     }
 
     count = solitaire.tableau_count[cursor_col];
     y = column_face_row[cursor_col];
-    if (count != 0u) {
-        index = (UINT8)(count - cursor_depth);
-        if (index > column_face_index[cursor_col]) {
-            y = (UINT8)(y + index - column_face_index[cursor_col]);
+    if (count == 0u || cursor_depth == 1u) {
+        if (count != 0u && (UINT8)(count - 1u) > column_face_index[cursor_col]) {
+            y = (UINT8)(y + count - 1u - column_face_index[cursor_col]);
         }
+        pointer_move_to((UINT8)(x + SOL_POINT_BODY_X), (UINT8)((y << 3u) + SOL_POINT_BODY_Y));
+        return;
     }
-    pointer_move_to(x, (UINT8)((y << 3u) + 3u));
+    index = (UINT8)(count - cursor_depth);
+    if (index > column_face_index[cursor_col]) {
+        y = (UINT8)(y + index - column_face_index[cursor_col]);
+    }
+    pointer_move_to((UINT8)(x + SOL_POINT_STRIP_X), (UINT8)((y << 3u) + SOL_POINT_STRIP_Y));
 }
 
 static void clamp_depth(void)
