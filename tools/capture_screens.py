@@ -53,6 +53,7 @@ def main() -> None:
             ("media", emu.SCENE_MEDIA),
             ("sweeper", emu.SCENE_SWEEPER),
             ("cannon", emu.SCENE_CANNON),
+            ("solitaire", emu.SCENE_SOLITAIRE),
         ]
         for index, (name, scene) in enumerate(apps):
             machine.launch_icon(index, scene)
@@ -70,17 +71,23 @@ def main() -> None:
                 machine.press("select")
                 machine.press("a")
                 machine.tick(8)
-            else:
+            elif name == "cannon":
                 machine.press("left", frames=8, settle=3)
                 machine.press("a")
                 machine.tick(20)
+            else:
+                machine.press("a")
+                machine.press("down")
+                machine.press("right")
+                machine.press("a")
+                machine.tick(4)
             save(machine, args.out, name)
             machine.press("start")
             machine.wait_scene(emu.SCENE_DESKTOP)
     finally:
         machine.stop()
 
-    print(f"captured boot, DOS, splash, desktop, and five apps in {args.out}")
+    print(f"captured boot, DOS, splash, desktop, and six apps in {args.out}")
 
 
 if __name__ == "__main__":

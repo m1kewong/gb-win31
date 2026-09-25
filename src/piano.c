@@ -48,7 +48,6 @@ UINT8 piano_key;
 static UINT8 piano_tone;
 static UiLabel tone_label;
 static UiLabel key_label;
-static char piano_art[64];
 
 static UINT8 key_tile(UINT8 region, UINT8 half, UINT8 edge, UINT8 pressed)
 {
@@ -71,10 +70,10 @@ static void build_key_tile(UINT8 region, UINT8 half, UINT8 edge, UINT8 pressed)
                 pixel = '3';
             }
             if (region == PIANO_REGION_BOTTOM && row == 7u) pixel = '3';
-            piano_art[(UINT8)(row * 8u + column)] = pixel;
+            ui_art_scratch[(UINT8)(row * 8u + column)] = pixel;
         }
     }
-    ui_art_load(1u, key_tile(region, half, edge, pressed), 1u, piano_art);
+    ui_art_load(1u, key_tile(region, half, edge, pressed), 1u, ui_art_scratch);
 }
 
 static void build_key_art(void)

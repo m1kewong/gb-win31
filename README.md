@@ -3,7 +3,8 @@
 A clean-room Game Boy Color desktop simulation inspired by classic Windows 3.1
 interaction and visual design. The ROM provides a BIOS/DOS boot illusion, a
 pointer-driven Program Manager, Paint, Piano, Media Player, Sweeper, Cannon,
-sound, and deterministic visual tests.
+Solitaire, sound, and deterministic visual tests. Solitaire is the one
+classic Windows 3.1 game that GBS Windows does not include.
 
 The interface uses a mixed-case proportional system font, white client areas,
 Windows 3.1 title-bar buttons, and application windows that open over an
@@ -54,6 +55,13 @@ The system font is edited as pixel art in `assets/system_font.txt`; run
 
 In Sweeper, click the smiley or `Game` for a new board, or the system box to
 close the window.
+
+Solitaire (Klondike, draw one, Windows standard scoring) uses snap controls:
+the D-pad jumps between piles and up/down picks how deep into a column to
+grab. A picks up and drops cards (on the stock it turns a card), B sends a card
+to the foundations, Select turns a card from anywhere, and moving up onto
+`Game` then pressing A deals again. Once every card is face up the game
+finishes itself.
 
 The checked-in golden frames are exact 160 x 144 PyBoy output. Real-hardware
 validation, minimisable windows, SRAM persistence, and optional printer support

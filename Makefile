@@ -28,7 +28,9 @@ ROM_SRCS := \
 	src/paint.c \
 	src/piano.c \
 	src/media.c \
-	src/cannon.c
+	src/cannon.c \
+	src/solitaire_model.c \
+	src/solitaire.c
 ROM_OBJS := $(ROM_SRCS:src/%.c=$(OBJDIR)/%.o)
 HEADERS := $(wildcard include/*.h)
 
@@ -55,8 +57,12 @@ font-check:
 build/test-minesweeper: src/minesweeper_model.c tests/test_minesweeper_model.c include/minesweeper_model.h | build
 	$(TEST_CC) -std=c99 -Wall -Wextra -Werror $(INCLUDES) -o $@ src/minesweeper_model.c tests/test_minesweeper_model.c
 
-test: build/test-minesweeper font-check
+build/test-solitaire: src/solitaire_model.c tests/test_solitaire_model.c include/solitaire_model.h | build
+	$(TEST_CC) -std=c99 -Wall -Wextra -Werror $(INCLUDES) -o $@ src/solitaire_model.c tests/test_solitaire_model.c
+
+test: build/test-minesweeper build/test-solitaire font-check
 	./build/test-minesweeper
+	./build/test-solitaire
 
 verify: $(TARGET)
 	python3 tools/verify_rom.py $(TARGET)

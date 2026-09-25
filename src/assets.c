@@ -224,7 +224,7 @@ static void build_misc_tiles(void)
  * '#' black. Keeping the silhouettes explicit makes them readable at the
  * Game Boy Color's native resolution instead of relying on loose patterns.
  */
-static const UINT8 icon_pixels[5][16][4] = {
+static const UINT8 icon_pixels[6][16][4] = {
     { /* Paint palette and diagonal brush. */
         { 0x00u, 0x00u, 0x00u, 0x00u }, /* ................ */
         { 0x00u, 0x00u, 0x00u, 0x03u }, /* ...............# */
@@ -314,6 +314,24 @@ static const UINT8 icon_pixels[5][16][4] = {
         { 0x0fu, 0xfeu, 0xefu, 0xf0u }, /* ..#####C#C####.. */
         { 0x00u, 0x0eu, 0xacu, 0x00u }, /* ......#CCC#..... */
         { 0x00u, 0x0fu, 0xfcu, 0x00u }  /* ......#####..... */
+    },
+    { /* Solitaire: patterned card back behind a spade card. */
+        { 0x00u, 0x00u, 0x00u, 0x00u }, /* ................ */
+        { 0x3fu, 0xffu, 0x00u, 0x00u }, /* .#######........ */
+        { 0x3au, 0x6bu, 0x00u, 0x00u }, /* .#CCYCC#........ */
+        { 0x39u, 0xa7u, 0x00u, 0x00u }, /* .#CYCCY#........ */
+        { 0x36u, 0xbfu, 0xffu, 0xf0u }, /* .#YCC#########.. */
+        { 0x3au, 0x70u, 0x00u, 0x30u }, /* .#CCY#.......#.. */
+        { 0x39u, 0xb1u, 0x00u, 0x30u }, /* .#CYC#.Y.....#.. */
+        { 0x36u, 0xb0u, 0x30u, 0x30u }, /* .#YCC#...#...#.. */
+        { 0x3au, 0x70u, 0xfcu, 0x30u }, /* .#CCY#..###..#.. */
+        { 0x39u, 0xb3u, 0xffu, 0x30u }, /* .#CYC#.#####.#.. */
+        { 0x3fu, 0xf3u, 0xcfu, 0x30u }, /* .#####.##.##.#.. */
+        { 0x00u, 0x30u, 0x30u, 0x30u }, /* .....#...#...#.. */
+        { 0x00u, 0x30u, 0x01u, 0x30u }, /* .....#.....Y.#.. */
+        { 0x00u, 0x30u, 0x00u, 0x30u }, /* .....#.......#.. */
+        { 0x00u, 0x3fu, 0xffu, 0xf0u }, /* .....#########.. */
+        { 0x00u, 0x00u, 0x00u, 0x00u }  /* ................ */
     }
 };
 
@@ -334,7 +352,7 @@ static void build_icons(void)
     UINT8 color;
     UINT8 tile;
 
-    for (icon = 0u; icon != 5u; ++icon) {
+    for (icon = 0u; icon != 6u; ++icon) {
         for (tile_y = 0u; tile_y != 2u; ++tile_y) {
             for (tile_x = 0u; tile_x != 2u; ++tile_x) {
                 tile_clear(0u);

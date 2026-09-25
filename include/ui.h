@@ -35,6 +35,9 @@ void ui_set_art(UINT8 x, UINT8 y, UINT8 tile, UINT8 palette);
 void ui_fill(UINT8 x, UINT8 y, UINT8 w, UINT8 h, UINT8 tile, UINT8 palette);
 void ui_art_load(UINT8 vram_bank, UINT8 first_tile, UINT8 count, const char *art);
 
+/* One 8x8 art tile of scratch shared by scenes; only one scene runs at a time. */
+extern char ui_art_scratch[64];
+
 /* Fixed-pitch 8x8 text for the BIOS and DOS screens. */
 void ui_text(UINT8 x, UINT8 y, const char *text, UINT8 palette);
 

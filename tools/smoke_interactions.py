@@ -28,6 +28,67 @@ PIANO_KEY_D_LOWER_LEFT = (4, 9)
 PIANO_PRESSED_LOWER_LEFT = 13
 
 
+# SolitaireModel layout (include/solitaire_model.h; SDCC packs without padding).
+SOL_TABLEAU = 48
+SOL_TABLEAU_COUNT = 181
+SOL_TABLEAU_HIDDEN = 188
+SOL_FOUNDATION_COUNT = 195
+SOL_FOUNDATION_SUIT = 199
+SOL_STOCK_COUNT = 203
+SOL_WASTE_COUNT = 204
+SOL_STATUS = 207
+SOL_WASTE = 24
+SOL_ART_BACK_TOP = 25
+SOL_MENU_POINTER = (14, 11)
+
+
+class SolitaireView:
+    def __init__(self, machine: emu.Emulator) -> None:
+        self.machine = machine
+        self.base = machine.address("_solitaire") & 0xFFFF
+
+    def byte(self, offset: int) -> int:
+        return self.machine.pyboy.memory[self.base + offset]
+
+    def counts(self) -> list[int]:
+        return [self.byte(SOL_TABLEAU_COUNT + c) for c in range(7)]
+
+    def hidden(self) -> list[int]:
+        return [self.byte(SOL_TABLEAU_HIDDEN + c) for c in range(7)]
+
+    def top(self, column: int) -> int | None:
+        count = self.byte(SOL_TABLEAU_COUNT + column)
+        return self.byte(SOL_TABLEAU + column * 19 + count - 1) if count else None
+
+    def waste_top(self) -> int | None:
+        count = self.byte(SOL_WASTE_COUNT)
+        return self.byte(SOL_WASTE + count - 1) if count else None
+
+
+def fits_tableau(card: int, target: int | None) -> bool:
+    if target is None:
+        return card % 13 == 12
+    red = lambda value: value // 13 in (1, 2)
+    return target % 13 == card % 13 + 1 and red(target) != red(card)
+
+
+def find_move(view: SolitaireView) -> tuple[str, int, int] | None:
+    """Return ('tableau', from, to) or ('waste', 0, to) for a legal single-card move."""
+    for source in range(7):
+        card = view.top(source)
+        if card is None:
+            continue
+        for target in range(7):
+            if target != source and view.top(target) is not None and fits_tableau(card, view.top(target)):
+                return ("tableau", source, target)
+    waste = view.waste_top()
+    if waste is not None:
+        for target in range(7):
+            if fits_tableau(waste, view.top(target)):
+                return ("waste", 0, target)
+    return None
+
+
 def led_tile(digit: int) -> int:
     return MS_ART_LED + digit * 2
 
@@ -61,6 +122,8 @@ def run_smoke(machine: emu.Emulator) -> None:
         "_audio_music_set",
         "_minesweeper_model_reveal",
         "_minesweeper_model_toggle_flag",
+        "_solitaire_model_draw",
+        "_solitaire_model_move",
     ):
         machine.hook(symbol)
 
@@ -177,6 +240,100 @@ def run_smoke(machine: emu.Emulator) -> None:
     machine.press("start")
     machine.wait_scene(emu.SCENE_DESKTOP)
     print("ok Cannon fire/reset/exit")
+
+    # Solitaire: deal shape, draw, one legal move via snap controls, new deal.
+    machine.launch_icon(5, emu.SCENE_SOLITAIRE)
+    view = SolitaireView(machine)
+    if view.counts() != [1, 2, 3, 4, 5, 6, 7] or view.hidden() != [0, 1, 2, 3, 4, 5, 6]:
+        raise EmuFailure(f"frame {machine.frame}: unexpected deal {view.counts()} {view.hidden()}")
+    if view.byte(SOL_STOCK_COUNT) != 24 or view.byte(SOL_WASTE_COUNT) != 0:
+        raise EmuFailure(f"frame {machine.frame}: stock/waste were not 24/0")
+    if machine.bg_tile(3, 2) != SOL_ART_BACK_TOP:
+        raise EmuFailure(f"frame {machine.frame}: stock is not drawn face down")
+
+    draws = machine.hook_count("_solitaire_model_draw")
+    machine.press("a")
+    machine.wait_until(lambda: view.byte(SOL_WASTE_COUNT) == 1, "one card turned to the waste")
+    if machine.hook_count("_solitaire_model_draw") != draws + 1 or view.byte(SOL_STOCK_COUNT) != 23:
+        raise EmuFailure(f"frame {machine.frame}: stock click did not draw exactly one card")
+    if not 0 <= machine.bg_tile(5, 2) < 13:
+        raise EmuFailure(f"frame {machine.frame}: waste card is not drawn face up")
+
+    move = find_move(view)
+    for _ in range(23):
+        if move is not None:
+            break
+        waste = view.byte(SOL_WASTE_COUNT)
+        machine.press("a")
+        machine.wait_until(lambda: view.byte(SOL_WASTE_COUNT) == waste + 1, "another draw")
+        move = find_move(view)
+    if move is None:
+        raise EmuFailure(f"frame {machine.frame}: seeded deal has no single-card move to exercise")
+    kind, source, target = move
+    before = view.counts()
+    moves = machine.hook_count("_solitaire_model_move")
+    if kind == "waste":
+        machine.press("right")
+        machine.press("a")
+        machine.press("down")
+        for _ in range(target - 1):
+            machine.press("right")
+        if target == 0:
+            machine.press("left")
+    else:
+        machine.press("down")
+        for _ in range(source):
+            machine.press("right")
+        machine.press("a")
+        step = "right" if target > source else "left"
+        for _ in range(abs(target - source)):
+            machine.press(step)
+    machine.press("a")
+    expected = list(before)
+    expected[target] += 1
+    if kind == "tableau":
+        expected[source] -= 1
+    machine.wait_until(lambda: view.counts() == expected, f"{kind} move to column {target}")
+    if machine.hook_count("_solitaire_model_move") != moves + 1:
+        raise EmuFailure(f"frame {machine.frame}: move was not dispatched exactly once")
+
+    for _ in range(24):
+        if machine.pointer_position() == SOL_MENU_POINTER:
+            break
+        machine.press("up", settle=3)
+    machine.press("a")
+    machine.wait_until(lambda: view.byte(SOL_STOCK_COUNT) == 24 and view.byte(SOL_WASTE_COUNT) == 0,
+                       "Game menu new deal")
+
+    # Endgame: spades A-10 are home and J/Q/K sit face up in columns 0-2.
+    # Sending the jack home must trigger autocomplete and then the win.
+    memory = machine.pyboy.memory
+    for column in range(7):
+        memory[view.base + SOL_TABLEAU_COUNT + column] = 0
+        memory[view.base + SOL_TABLEAU_HIDDEN + column] = 0
+    for foundation in range(4):
+        memory[view.base + SOL_FOUNDATION_SUIT + foundation] = foundation
+        memory[view.base + SOL_FOUNDATION_COUNT + foundation] = 13 if foundation < 3 else 10
+    for column, card in enumerate((3 * 13 + 12, 3 * 13 + 11, 3 * 13 + 10)):
+        memory[view.base + SOL_TABLEAU + column * 19] = card
+        memory[view.base + SOL_TABLEAU_COUNT + column] = 1
+    memory[view.base + SOL_STOCK_COUNT] = 0
+    memory[view.base + SOL_WASTE_COUNT] = 0
+    machine.press("down")
+    machine.press("down")
+    machine.press("down")
+    machine.press("right")
+    machine.press("right")
+    machine.press("b")
+    machine.wait_until(lambda: view.byte(SOL_STATUS) == 1, "autocomplete to a win", timeout=180)
+    if [view.byte(SOL_FOUNDATION_COUNT + f) for f in range(4)] != [13, 13, 13, 13]:
+        raise EmuFailure(f"frame {machine.frame}: win reported before all foundations were full")
+    machine.press("a")
+    machine.wait_until(lambda: view.byte(SOL_STATUS) == 0 and view.byte(SOL_STOCK_COUNT) == 24,
+                       "A deals again after a win")
+    machine.press("start")
+    machine.wait_scene(emu.SCENE_DESKTOP)
+    print(f"ok Solitaire deal/draw/{kind} move/new deal/autocomplete win")
 
     machine.press(("right", "down"), frames=200)
     if machine.pointer_position() != (152, 136):
