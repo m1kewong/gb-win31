@@ -10,7 +10,7 @@ INCLUDES := -Iinclude
 CFLAGS := $(INCLUDES)
 # MBC5 + 8 KiB battery SRAM, CGB-only, with automatic bank assignment for
 # every source that declares `#pragma bank 255`.
-ROM_FLAGS := -Wm-yC -Wm-yn"GB WORKBENCH" -Wl-yt0x1B -Wm-ya1 -Wl-j \
+ROM_FLAGS := -Wm-yC -Wm-yn"GB WORKBENCH" -Wm-yt0x1B -Wm-ya2 -Wl-j \
 	-autobank -Wb-ext=.rel
 
 ROM_SRCS := \
