@@ -11,6 +11,8 @@ import gbw_emu as emu
 from gbw_emu import EmuFailure
 
 OBJ_SIZE_8X16 = 0x04
+# Last inked row of the 8x14 arrow (src/assets.c build_pointer).
+ARROW_LAST_ROW = 13
 
 # Sweeper layout and bank-1 art (mirrors src/minesweeper.c).
 MS_BOARD_X = 5
@@ -96,11 +98,24 @@ def led_tile(digit: int) -> int:
 def assert_pointer_sprite(machine: emu.Emulator) -> None:
     if machine.pyboy.memory[emu.LCDC_REG] & OBJ_SIZE_8X16:
         raise EmuFailure(f"frame {machine.frame}: pointer is not in 8x8 mode")
-    arrow = machine.vram_bytes(0, 0x8000 + emu.TILE_POINTER_SPRITE * 16, 32)
-    if arrow[0] & 0x80 == 0 or arrow[1] & 0x80 == 0:
+    data = machine.vram_bytes(0, 0x8000 + emu.TILE_POINTER_SPRITE * 16, 32)
+    # Decode both stacked tiles into a 8x16 grid of colour indices.
+    arrow = [[((data[row * 2] >> (7 - x)) & 1) | (((data[row * 2 + 1] >> (7 - x)) & 1) << 1)
+              for x in range(8)] for row in range(16)]
+    if arrow[0][0] != 3:
         raise EmuFailure(f"frame {machine.frame}: arrow tip is not black at the hotspot")
-    if any(byte & 1 for byte in arrow) or arrow[-6:] != bytes(6):
-        raise EmuFailure(f"frame {machine.frame}: arrow lost its transparent right/bottom padding")
+    inked = [row for row in range(16) if any(arrow[row])]
+    if inked[-1] != ARROW_LAST_ROW:
+        raise EmuFailure(f"frame {machine.frame}: arrow ends on row {inked[-1]}, not {ARROW_LAST_ROW}")
+    for row in range(16):
+        for x in range(8):
+            if arrow[row][x] != 1:
+                continue
+            for nx, ny in ((x - 1, row), (x + 1, row), (x, row - 1), (x, row + 1)):
+                if not (0 <= nx < 8 and 0 <= ny < 16) or arrow[ny][nx] == 0:
+                    raise EmuFailure(
+                        f"frame {machine.frame}: arrow fill at {x},{row} is not enclosed by its outline"
+                    )
     oam = machine.pyboy.memory
     if (oam[emu.OAM_BASE + 4], oam[emu.OAM_BASE + 5]) != (oam[emu.OAM_BASE] + 8, oam[emu.OAM_BASE + 1]):
         raise EmuFailure(f"frame {machine.frame}: arrow tail sprite is not under the head")

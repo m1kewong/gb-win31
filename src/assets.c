@@ -369,8 +369,9 @@ static void build_icons(void)
     }
 }
 
-/* Windows-style arrow over two stacked 8x8 sprites; the hotspot is the tip at
- * the top-left pixel. Colour 3 outline, colour 1 fill, colour 0 transparent. */
+/* Windows 3.1 arrow, 8x14 over two stacked 8x8 sprites. The hotspot is the tip
+ * at the top-left pixel; the tail is two pixels wide with a rounded cap.
+ * Colour 3 outline, colour 1 fill, colour 0 transparent. */
 static void build_pointer(void)
 {
     static const UINT8 pointer_tiles[32] = {
@@ -381,15 +382,15 @@ static void build_pointer(void)
         0xf8u, 0x88u, /* XoooX... */
         0xfcu, 0x84u, /* XooooX.. */
         0xfeu, 0x82u, /* XoooooX. */
-        0xfeu, 0x8eu, /* XoooXXX. */
-        0xf8u, 0xa8u, /* XoXoX... */
-        0xdcu, 0xd4u, /* XX.XoX.. */
-        0x1cu, 0x14u, /* ...XoX.. */
-        0x0eu, 0x0au, /* ....XoX. */
+        0xffu, 0x87u, /* XooooXXX */
+        0xfcu, 0xa4u, /* XoXooX.. */
+        0xdeu, 0xd2u, /* XX.XooX. */
+        0x9eu, 0x92u, /* X..XooX. */
+        0x0fu, 0x09u, /* ....XooX */
+        0x0fu, 0x09u, /* ....XooX */
         0x06u, 0x06u, /* .....XX. */
-        0x00u, 0x00u,
-        0x00u, 0x00u,
-        0x00u, 0x00u
+        0x00u, 0x00u, /* ........ */
+        0x00u, 0x00u  /* ........ */
     };
 
     set_sprite_data(TILE_POINTER_SPRITE, TILE_POINTER_SPRITE_COUNT, pointer_tiles);

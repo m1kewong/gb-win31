@@ -49,9 +49,10 @@ The layout above is unchanged; the surface treatment moved closer to Windows
   selected caption gets a tight navy box instead of a full-cell fill.
 - Application windows (Sweeper, Piano, Media) are drawn over the Program
   Manager, which switches to inactive titles behind them.
-- The pointer is a Windows-style arrow with a tail (7 x 13, two stacked 8 x 8
-  sprites) whose hotspot is the tip. On the desktop it rests beside the
-  selected icon so it never covers a caption.
+- The pointer is a Windows 3.1 arrow (8 x 14, two stacked 8 x 8 sprites) whose
+  hotspot is the tip. Like the original, its tail is two pixels wide, steps
+  right every two rows and ends in a rounded cap. On the desktop it rests
+  beside the selected icon so it never covers a caption.
 
 ## Visual rules (revision 1)
 

@@ -44,9 +44,9 @@ byte-for-byte with GBDK 4.5.0 before any change.
   both checksums.
 - `make smoke-test` (PyBoy 2.7.0), synchronised on the exported `gbw_scene`
   byte rather than on rendered text:
-  - boot quick-start to desktop; two-sprite arrow pointer with a black tip at
-    the hotspot, transparent padding, and the tail sprite locked 8px under the
-    head;
+  - boot quick-start to desktop; the 8x14 arrow has a black tip at the
+    hotspot, a fill fully enclosed by its outline, a tail reaching row 13, and
+    the tail sprite locked 8px under the head;
   - empty desktop click changes nothing;
   - Paint writes the expected bank-1 pixel bytes;
   - Sweeper opens over the Program Manager, flags (LED 010 -> 009), reveals,
