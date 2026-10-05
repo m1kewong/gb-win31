@@ -41,6 +41,7 @@ SOL_WASTE_COUNT = 204
 SOL_STATUS = 207
 SOL_WASTE = 24
 SOL_ART_BACK_TOP = 25
+SOL_ART_EMPTY_TOP = 31
 SOL_MENU_POINTER = (14, 11)
 
 
@@ -319,10 +320,21 @@ def run_smoke(machine: emu.Emulator) -> None:
     machine.press("a")
     machine.wait_until(lambda: view.byte(SOL_STOCK_COUNT) == 24 and view.byte(SOL_WASTE_COUNT) == 0,
                        "Game menu new deal")
+    memory = machine.pyboy.memory
+
+    # Stock already empty and one ace left in the waste: sending it home with B
+    # must turn the stock's recycle ring into an empty outline.
+    memory[view.base + SOL_STOCK_COUNT] = 0
+    memory[view.base + SOL_WASTE] = 0
+    memory[view.base + SOL_WASTE_COUNT] = 1
+    machine.press("right")
+    machine.press("b")
+    machine.wait_until(lambda: view.byte(SOL_WASTE_COUNT) == 0, "waste ace sent to a foundation")
+    machine.wait_tile(3, 2, SOL_ART_EMPTY_TOP)
+    machine.press("left")
 
     # Endgame: spades A-10 are home and J/Q/K sit face up in columns 0-2.
     # Sending the jack home must trigger autocomplete and then the win.
-    memory = machine.pyboy.memory
     for column in range(7):
         memory[view.base + SOL_TABLEAU_COUNT + column] = 0
         memory[view.base + SOL_TABLEAU_HIDDEN + column] = 0
@@ -348,7 +360,7 @@ def run_smoke(machine: emu.Emulator) -> None:
                        "A deals again after a win")
     machine.press("start")
     machine.wait_scene(emu.SCENE_DESKTOP)
-    print(f"ok Solitaire deal/draw/{kind} move/new deal/autocomplete win")
+    print(f"ok Solitaire deal/draw/{kind} move/new deal/stock refresh/autocomplete win")
 
     machine.press(("right", "down"), frames=200)
     if machine.pointer_position() != (152, 136):

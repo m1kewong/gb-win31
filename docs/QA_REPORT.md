@@ -38,7 +38,10 @@ byte-for-byte with GBDK 4.5.0 before any change.
   rules, illegal moves, run moves with flips, scoring, auto-foundation, win,
   autocomplete, and a 300-game random soak asserting card conservation and
   tableau invariants after every action) pass with `-Wall -Wextra -Werror`.
-  Both suites also pass under AddressSanitizer and UndefinedBehaviorSanitizer.
+  An input suite builds `src/input.c` against a stub `<gb/gb.h>` and stages
+  VBlank/main-loop interleavings: a press is delivered exactly once whether the
+  VBlank handler, the main loop or both see it first. All three suites also
+  pass under AddressSanitizer and UndefinedBehaviorSanitizer.
   The generated font table matches `assets/system_font.txt`.
 - `make verify`: size, title, CGB-only flag, MBC5 type, ROM/RAM size codes and
   both checksums.
@@ -56,8 +59,9 @@ byte-for-byte with GBDK 4.5.0 before any change.
   - Cannon scores, resets score and lives, and exits;
   - Solitaire deals 1-7 with 24 in stock, turns a card, plays a legal move
     found from live WRAM through the snap controls, deals again from the
-    Game menu, and from an injected endgame autocompletes to a win and
-    redeals with A;
+    Game menu, redraws an emptied stock after B sends the last waste card
+    home, and from an injected endgame autocompletes to a win and redeals
+    with A;
   - pointer reaches the (152, 136) bottom-right bound.
 - `make visual-test`: ten deterministic 160 x 144 frames compare
   pixel-for-pixel with `tests/golden/`. Three consecutive captures were

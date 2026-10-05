@@ -624,6 +624,8 @@ static void press_b(void)
     }
     draw_pile(pile);
     draw_pile(target);
+    /* An empty waste turns the stock's recycle ring into an empty outline. */
+    if (pile == SOL_PILE_WASTE) draw_stock();
     cursor_depth = 1u;
     after_move(solitaire_model_is_won(&solitaire) ? SOL_ACTION_WON : SOL_ACTION_CHANGED);
 }
