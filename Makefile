@@ -60,9 +60,14 @@ build/test-minesweeper: src/minesweeper_model.c tests/test_minesweeper_model.c i
 build/test-solitaire: src/solitaire_model.c tests/test_solitaire_model.c include/solitaire_model.h | build
 	$(TEST_CC) -std=c99 -Wall -Wextra -Werror $(INCLUDES) -o $@ src/solitaire_model.c tests/test_solitaire_model.c
 
-test: build/test-minesweeper build/test-solitaire font-check
+# input.c builds on the host against a stub <gb/gb.h> in tests/stubs.
+build/test-input: src/input.c tests/test_input.c include/input.h tests/stubs/gb/gb.h | build
+	$(TEST_CC) -std=c99 -Wall -Wextra -Werror -Itests/stubs $(INCLUDES) -o $@ src/input.c tests/test_input.c
+
+test: build/test-minesweeper build/test-solitaire build/test-input font-check
 	./build/test-minesweeper
 	./build/test-solitaire
+	./build/test-input
 
 verify: $(TARGET)
 	python3 tools/verify_rom.py $(TARGET)

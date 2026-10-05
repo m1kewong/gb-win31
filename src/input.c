@@ -37,13 +37,18 @@ void input_update(void)
     UINT8 directions;
     UINT8 latched;
     UINT8 previous_directions;
+    UINT8 held;
 
     CRITICAL {
+        held = joypad();
         latched = latched_pressed;
         latched_pressed = 0u;
+        /* Share this sample with the VBlank handler; otherwise a press first
+         * seen here would be latched again at the next VBlank. */
+        vbl_previous = held;
     }
 
-    input_state.held = joypad();
+    input_state.held = held;
     input_state.pressed = (UINT8)((input_state.held & (UINT8)~previous_held) | latched);
     input_state.released = (UINT8)(previous_held & (UINT8)~input_state.held);
     input_state.repeated = input_state.pressed;
