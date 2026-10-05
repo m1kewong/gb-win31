@@ -9,7 +9,8 @@ typedef enum AppState {
     APP_PAINT,
     APP_PIANO,
     APP_MEDIA,
-    APP_CANNON
+    APP_CANNON,
+    APP_SOLITAIRE
 } AppState;
 
 #endif

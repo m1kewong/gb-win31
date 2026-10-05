@@ -18,7 +18,7 @@ enum DesktopTextTile {
     DT_ACCESSORIES = DT_MENU + 18u,
     DT_GAMES = DT_ACCESSORIES + 8u,
     DT_CAPTIONS = DT_GAMES + 4u,
-    DT_END = DT_CAPTIONS + 28u
+    DT_END = DT_CAPTIONS + 32u
 };
 
 typedef char desktop_text_fits_bank_zero[(DT_END <= 256u) ? 1 : -1];
@@ -49,8 +49,9 @@ static const DesktopIcon desktop_icons[] = {
     {3u, 4u, 2u, 7u, 5u, DT_CAPTIONS, 32u, TILE_ICON_PAINT, "Paint", APP_PAINT, 0u},
     {9u, 4u, 7u, 7u, 6u, DT_CAPTIONS + 5u, 80u, TILE_ICON_PIANO, "Piano", APP_PIANO, 0u},
     {15u, 4u, 13u, 7u, 5u, DT_CAPTIONS + 11u, 128u, TILE_ICON_MEDIA, "Media", APP_MEDIA, 0u},
-    {5u, 12u, 3u, 14u, 6u, DT_CAPTIONS + 16u, 48u, TILE_ICON_SWEEPER, "Sweeper", APP_SWEEPER, 1u},
-    {13u, 12u, 11u, 14u, 6u, DT_CAPTIONS + 22u, 112u, TILE_ICON_CANNON, "Cannon", APP_CANNON, 1u}
+    {3u, 12u, 2u, 14u, 5u, DT_CAPTIONS + 16u, 32u, TILE_ICON_SWEEPER, "Sweeper", APP_SWEEPER, 1u},
+    {9u, 12u, 7u, 14u, 6u, DT_CAPTIONS + 21u, 80u, TILE_ICON_CANNON, "Cannon", APP_CANNON, 1u},
+    {15u, 12u, 13u, 14u, 5u, DT_CAPTIONS + 27u, 128u, TILE_ICON_SOLITAIRE, "Solitaire", APP_SOLITAIRE, 1u}
 };
 
 #define DESKTOP_ICON_COUNT (sizeof(desktop_icons) / sizeof(desktop_icons[0]))

@@ -11,7 +11,7 @@ from PIL import Image, ImageChops
 
 SCREENS = (
     "boot", "dos", "splash", "desktop", "paint", "piano", "media",
-    "sweeper", "cannon",
+    "sweeper", "cannon", "solitaire",
 )
 
 
@@ -42,7 +42,7 @@ def main() -> None:
 
     if failures:
         raise SystemExit("visual regression failed:\n" + "\n".join(failures))
-    print("visual regression: all nine 160x144 frames match")
+    print(f"visual regression: all {len(SCREENS)} 160x144 frames match")
 
 
 if __name__ == "__main__":

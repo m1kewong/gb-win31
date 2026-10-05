@@ -11,6 +11,7 @@
 #include "piano.h"
 #include "media.h"
 #include "cannon.h"
+#include "solitaire.h"
 #include "ui.h"
 
 /* 0x80 | scene that finished entering; emulator tests synchronise on it.
@@ -28,6 +29,7 @@ static void enter_state(AppState state)
         case APP_PIANO: piano_enter(); break;
         case APP_MEDIA: media_enter(); break;
         case APP_CANNON: cannon_enter(); break;
+        case APP_SOLITAIRE: solitaire_enter(); break;
         default: state = APP_DESKTOP; desktop_enter(); break;
     }
     gbw_scene = (UINT8)(0x80u | (UINT8)state);
@@ -44,6 +46,7 @@ static AppState update_state(AppState state, const InputState *input)
         case APP_PIANO: return piano_update(input);
         case APP_MEDIA: return media_update(input);
         case APP_CANNON: return cannon_update(input);
+        case APP_SOLITAIRE: return solitaire_update(input);
         default: return APP_DESKTOP;
     }
 }

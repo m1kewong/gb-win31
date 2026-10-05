@@ -10,7 +10,7 @@ INCLUDES := -Iinclude
 CFLAGS := $(INCLUDES)
 # MBC5 + 8 KiB battery SRAM, CGB-only, with automatic bank assignment for
 # every source that declares `#pragma bank 255`.
-ROM_FLAGS := -Wm-yC -Wm-yn"GB WORKBENCH" -Wm-yt0x1B -Wm-ya2 -Wl-j \
+ROM_FLAGS := -Wm-yC -Wm-yn"GB WORKBENCH" -Wm-yt0x1B -Wm-ya1 -Wl-j \
 	-autobank -Wb-ext=.rel
 
 ROM_SRCS := \
@@ -28,7 +28,9 @@ ROM_SRCS := \
 	src/paint.c \
 	src/piano.c \
 	src/media.c \
-	src/cannon.c
+	src/cannon.c \
+	src/solitaire_model.c \
+	src/solitaire.c
 ROM_OBJS := $(ROM_SRCS:src/%.c=$(OBJDIR)/%.o)
 HEADERS := $(wildcard include/*.h)
 
@@ -55,8 +57,17 @@ font-check:
 build/test-minesweeper: src/minesweeper_model.c tests/test_minesweeper_model.c include/minesweeper_model.h | build
 	$(TEST_CC) -std=c99 -Wall -Wextra -Werror $(INCLUDES) -o $@ src/minesweeper_model.c tests/test_minesweeper_model.c
 
-test: build/test-minesweeper font-check
+build/test-solitaire: src/solitaire_model.c tests/test_solitaire_model.c include/solitaire_model.h | build
+	$(TEST_CC) -std=c99 -Wall -Wextra -Werror $(INCLUDES) -o $@ src/solitaire_model.c tests/test_solitaire_model.c
+
+# input.c builds on the host against a stub <gb/gb.h> in tests/stubs.
+build/test-input: src/input.c tests/test_input.c include/input.h tests/stubs/gb/gb.h | build
+	$(TEST_CC) -std=c99 -Wall -Wextra -Werror -Itests/stubs $(INCLUDES) -o $@ src/input.c tests/test_input.c
+
+test: build/test-minesweeper build/test-solitaire build/test-input font-check
 	./build/test-minesweeper
+	./build/test-solitaire
+	./build/test-input
 
 verify: $(TARGET)
 	python3 tools/verify_rom.py $(TARGET)
